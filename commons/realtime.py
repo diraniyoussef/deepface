@@ -144,7 +144,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 
 			if len(faces) == 0:
 				face_included_frames = 0
-		else:
+		else: #Youssef- freeze is True, don't get more faces (in this frame)
 			faces = []
 
 		detected_faces = []
@@ -156,9 +156,9 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 				if face_index == 0:
 					face_included_frames = face_included_frames + 1 #increase frame for a single face
 
-				cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image
+				cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image #Youssef - (67,67,67) is the color of the rectangle, and 1 is probably its width in pixels.
 
-				cv2.putText(img, str(frame_threshold - face_included_frames), (int(x+w/4),int(y+h/1.5)), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 255, 255), 2)
+				cv2.putText(img, str(frame_threshold - face_included_frames), (int(x+w/4),int(y+h/1.5)), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 255, 255), 2) #Youssef - 4 is like the scale, 2 is like the pixel size, (int(x+w/4),int(y+h/1.5)) tuple is the (right, down) translation where the bottom left of the text will be positioned.
 
 				detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face
 
@@ -457,7 +457,8 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 		else:
 			cv2.imshow('img',img)
 
-		if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
+#		if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
+		if (cv2.waitKey(1) & 0xFF == ord('q')) or ret == False : #Youssef - use ret in case no more frames in a video file
 			break
 
 	#kill open cv things

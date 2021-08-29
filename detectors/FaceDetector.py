@@ -7,6 +7,7 @@ from deepface.commons import distance
 def build_model(detector_backend):
 
     global face_detector_obj #singleton design pattern
+	#Youssef - face_detector_obj will be a dictionary of the facedetector models. It may contain just 1 key-value pair.
 
     backends = {
         'opencv': OpenCvWrapper.build_model,
@@ -56,7 +57,7 @@ def detect_faces(face_detector, detector_backend, img, align = True):
     detect_face = backends.get(detector_backend)
 
     if detect_face:
-        obj = detect_face(face_detector, img, align)
+        obj = detect_face(face_detector, img, align) #Youssef - this detect_face(...) is actually something like OpenCvWrapper.detect_face(...)
         #obj stores list of detected_face and region pair
 
         return obj

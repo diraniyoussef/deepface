@@ -58,7 +58,7 @@ def build_model(model_name):
 	if not model_name in model_obj.keys():
 		model = models.get(model_name)
 		if model:
-			model = model()
+			model = model() #Youssef - here is the building
 			model_obj[model_name] = model
 			#print(model_name," built")
 		else:
@@ -798,6 +798,15 @@ def stream(db_path = '', model_name ='VGG-Face', detector_backend = 'opencv', di
 	if frame_threshold < 1:
 		raise ValueError("frame_threshold must be greater than the value 1 but you passed "+str(frame_threshold))
 
+	realtime.analysis(db_path, model_name, detector_backend, distance_metric, enable_face_analysis
+						, source = source, time_threshold = time_threshold, frame_threshold = frame_threshold)
+
+def analyze_stream(db_path = '', model_name ='VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', source = 0):
+	"""
+	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold.
+		Having e.g. 6 persons detected, if those are recognized from the database then it's fine. If one or more of them weren't recognized, a new profile will be created in the database in a folder called "new", and it will contain a folder for each new person, not named
+at each frame (and its corresponding instance of time) there would be an analysis of each and every one of them; we would have a table where the colomns is the name of those people
+	"""
 	realtime.analysis(db_path, model_name, detector_backend, distance_metric, enable_face_analysis
 						, source = source, time_threshold = time_threshold, frame_threshold = frame_threshold)
 

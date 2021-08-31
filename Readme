@@ -1,0 +1,12 @@
+This repo is based on Serif Serengal's repository.
+I shall made some modifications by God's will.
+
+I only focus on some functionalities which may be useful for some applications like :
+
+1) Face identification as in access control, e.g. whenever a new person appears in the video from an IP camera or a recorded video, the application notifies the user of that new person and saves some images of him in the database where the user can enter some info about him. Each person has a folder in his name containing images of him. 
+This feature is not intended for critical security applications, i.e. the environment is trusted. It's just to make things handy for data entry.
+
+2) Examining the emotions of students in class, or the emotions of a patient in a clinical psychiatry, or the emotions of someone in a recorded interview on laptop or on Youtube.
+
+I may also make a lightweight api for that.
+

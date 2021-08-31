@@ -1,6 +1,6 @@
 import warnings
 warnings.filterwarnings("ignore")
-
+ 
 import os
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -467,6 +467,26 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
+def find_in_video(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+	"""
+	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image like . 
+	These are the additional features :
+	1) The git functionality runs at the start and upon user request as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database.
+	2) For each detected person there is a record showing when the person appeared and when he disappeared. It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons.
+	"""
+	return None
+
+def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+	"""
+	This function detects a face in an input image, and search for that person in a database.
+	More than 1 person is also handled. 
+	In the search, it relies on a .pkl file and creates one in case it wasn't created already.
+	The following is what differs from the old find function :
+		1) It supports a git api, so as when this function is called, it checks the git status to know whether to remove, rename, or add something to the pkl file because the user had made a similar change to the database. 
+		2) It supports automatic addition of new persons detected while running according the value of auto_add. Having e.g. 6 persons detected, if some of those weren't recognized, a new profile will be created in the database in a folder called "new", and it will contain a folder for each new person with some random name. 
+	"""
+	return None
+
 def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 
 	"""
@@ -497,7 +517,7 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 	tic = time.time()
 
-	img_paths, bulkProcess = functions.initialize_input(img_path)
+	img_paths, bulkProcess = functions.initialize_input(img_path) #bulkprocess means that img_paths is more than 1 image
 
 	#-------------------------------
 
@@ -801,14 +821,6 @@ def stream(db_path = '', model_name ='VGG-Face', detector_backend = 'opencv', di
 	realtime.analysis(db_path, model_name, detector_backend, distance_metric, enable_face_analysis
 						, source = source, time_threshold = time_threshold, frame_threshold = frame_threshold)
 
-def analyze_stream(db_path = '', model_name ='VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', source = 0):
-	"""
-	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold.
-		Having e.g. 6 persons detected, if those are recognized from the database then it's fine. If one or more of them weren't recognized, a new profile will be created in the database in a folder called "new", and it will contain a folder for each new person, not named
-at each frame (and its corresponding instance of time) there would be an analysis of each and every one of them; we would have a table where the colomns is the name of those people
-	"""
-	realtime.analysis(db_path, model_name, detector_backend, distance_metric, enable_face_analysis
-						, source = source, time_threshold = time_threshold, frame_threshold = frame_threshold)
 
 def detectFace(img_path, detector_backend = 'opencv', enforce_detection = True, align = True):
 

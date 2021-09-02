@@ -469,6 +469,6 @@ def analyze_stream(db_path = '', auto_add = False, model_name ='VGG-Face', detec
 	"""
 	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. if it's a live stream, it has the option of being recorded so that at replay time one can check the emotion continuously. 
 		auto_add is the option to check for faces that match the faces there in the database but won't write to it. While if set to True, it will add new encountered faces to it.
-		Having e.g. 6 persons detected, if those are recognized from the database then it's fine. If one or more of them weren't recognized, a new profile will be created in the database in a folder called "new", and it will contain a folder for each new person, not named at each frame (and its corresponding instance of time) there would be an analysis of each and every one of them; we would have a table where the colomns is the name of those people
+		Having e.g. 6 persons detected, there would be an analysis to each and every one of them; we would have a table where the colomns are the name of those people
 	"""
 	

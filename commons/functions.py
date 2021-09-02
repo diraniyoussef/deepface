@@ -23,6 +23,8 @@ elif tf_major_version == 2:
 	from tensorflow.keras.applications.imagenet_utils import preprocess_input
 	from tensorflow.keras.preprocessing import image
 
+from git import Repo
+import time
 #--------------------------------------------------
 
 def initialize_input(img1_path, img2_path = None):
@@ -265,3 +267,51 @@ def find_input_shape(model):
 		input_shape = tuple(input_shape)
 
 	return input_shape
+
+def check_change(db_path="."): #this whole function can be called in its own thread
+	#User might add an image to his database, might rename, move, delete, etc...
+	try:
+		repo = Repo(db_path) #this throws an error if it's not git-initialized already
+	except Exception:
+		repo = Repo.init(db_path, bare=False) #initializing
+	
+	img_type = (".jpeg",".jpg",".png")
+	#check for untracked files
+	to_be_added_images_list = []
+	for f in repo.untracked_files: 
+		if(f.endswith(img_type)):
+			to_be_added_images_list.append(f) #images aren't tracked yet
+	#check for unstaged files (which are already tracked)
+	to_be_removed_images_list = []
+	for x in repo.index.diff(None):
+		if(x.b_path.endswith(img_type)):#added in case someone messes with the repo, like adds something which isn't an image to the git staging area i.e. tracking it.
+			if(x.change_type == 'M'): #not sure how an image file could be modified, anyway
+				to_be_added_images_list.append(x.b_path)
+			elif(x.change_type == 'D'):
+				to_be_removed_images_list.append(x.b_path)
+	#Although user might rename an image and it might be worthy to trace such thing, but it is not a direct process in git so postponed. A renamed file is deleted and made new when it comes to git and us.
+	
+	#Goal Section
+	#this function check_change is to trace the files to update the pkl vector representation of the images quickly without having to read the whole database for a tiny change made by the user like adding an image or deleting another.
+	
+	#End of Goal Section
+		
+	#Now staging images to make them ready for committing and to clear the staging area for future changes
+	commit = False
+	if(len(to_be_added_images_list) > 0):
+		#Attempting to add the files to the staging (committing) area in order to finally commit
+		commit = True
+		try:
+			repo.index.add(to_be_added_images_list) #images are now tracked and are in the committing area.
+		except Exception as err:
+			print("Git error while adding untracked file(s)", err)	
+	if(len(to_be_removed_images_list) > 0):
+		commit = True
+		#removing images
+		try:
+        repo.index.remove(to_be_removed_images_list) #it removes the file after being added or even committed, then it returns it back to being untracked if it ever existed again, I guess
+		except Exception as err:
+			print("Git error while adding untracked file(s)", err)
+	#committing 
+	if(commit):
+		repo.index.commit("commit at " + time.ctime().replace(" ", "_"))

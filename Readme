@@ -8,5 +8,7 @@ This feature is not intended for critical security applications, i.e. the enviro
 
 2) Examining the emotions of students in class, or the emotions of a patient in a clinical psychiatry, or the emotions of someone in a recorded interview on laptop or on Youtube.
 
+These operations shall be made in a multiprocessing fashion whenever suitable.
+
 I may also make a lightweight api for that.
 

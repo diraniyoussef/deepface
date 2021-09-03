@@ -66,7 +66,7 @@ def build_model(model_name):
 
 	return model_obj[model_name]
 
-def verify(img1_path, img2_path = '', model_name = 'VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+def verify(img1_path, img2_path = '', model_name = 'VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 
 	"""
 	This function verifies an image pair is same person or different persons.
@@ -87,7 +87,7 @@ def verify(img1_path, img2_path = '', model_name = 'VGG-Face', distance_metric =
 
 			model = DeepFace.build_model('VGG-Face')
 
-		enforce_detection (boolean): If any face could not be detected in an image, then verify function will return exception. Set this to False not to have this exception. This might be convenient for low resolution images.
+		hard_detection_failure (boolean): If any face could not be detected in an image, then verify function will return exception. Set this to False not to have this exception. This might be convenient for low resolution images.
 
 		detector_backend (string): set face detector backend as retinaface, mtcnn, opencv, ssd or dlib
 
@@ -157,17 +157,17 @@ def verify(img1_path, img2_path = '', model_name = 'VGG-Face', distance_metric =
 			for i in  model_names:
 				custom_model = models[i]
 
-				#img_path, model_name = 'VGG-Face', model = None, enforce_detection = True, detector_backend = 'mtcnn'
+				#img_path, model_name = 'VGG-Face', model = None, hard_detection_failure = True, detector_backend = 'mtcnn'
 				img1_representation = represent(img_path = img1_path
 						, model_name = model_name, model = custom_model
-						, enforce_detection = enforce_detection, detector_backend = detector_backend
+						, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend
 						, align = align
 						, normalization = normalization
 						)
 
 				img2_representation = represent(img_path = img2_path
 						, model_name = model_name, model = custom_model
-						, enforce_detection = enforce_detection, detector_backend = detector_backend
+						, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend
 						, align = align
 						, normalization = normalization
 						)
@@ -264,7 +264,7 @@ def verify(img1_path, img2_path = '', model_name = 'VGG-Face', distance_metric =
 
 		return resp_obj
 
-def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = {}, enforce_detection = True, detector_backend = 'opencv', prog_bar = True):
+def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = {}, hard_detection_failure = True, detector_backend = 'opencv', prog_bar = True):
 
 	"""
 	This function analyzes facial attributes including age, gender, emotion and race
@@ -282,7 +282,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 			models['emotion'] = DeepFace.build_model('Emotion')
 			models['race'] = DeepFace.build_model('race')
 
-		enforce_detection (boolean): The function throws exception if a face could not be detected. Set this to True if you don't want to get exception. This might be convenient for low resolution images.
+		hard_detection_failure (boolean): The function throws exception if a face could not be detected. Set this to True if you don't want to get exception. This might be convenient for low resolution images.
 
 		detector_backend (string): set face detector backend as retinaface, mtcnn, opencv, ssd or dlib.
 
@@ -384,7 +384,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 			if action == 'emotion':
 				emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
-				img, region = functions.preprocess_face(img = img_path, target_size = (48, 48), grayscale = True, enforce_detection = enforce_detection, detector_backend = detector_backend, return_region = True) #target_size = (224, 224)
+				img, region = functions.preprocess_face(img = img_path, target_size = (48, 48), grayscale = True, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, return_region = True) #target_size = (224, 224)
 
 				emotion_predictions = models['emotion'].predict(img)[0,:]
 
@@ -401,7 +401,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 			elif action == 'age':
 				if img_224 is None:
-					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, enforce_detection = enforce_detection, detector_backend = detector_backend, return_region = True)
+					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, return_region = True)
 
 				age_predictions = models['age'].predict(img_224)[0,:]
 				apparent_age = Age.findApparentAge(age_predictions)
@@ -410,7 +410,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 			elif action == 'gender':
 				if img_224 is None:
-					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, enforce_detection = enforce_detection, detector_backend = detector_backend, return_region = True)
+					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, return_region = True)
 
 				gender_prediction = models['gender'].predict(img_224)[0,:]
 
@@ -423,7 +423,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 			elif action == 'race':
 				if img_224 is None:
-					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, enforce_detection = enforce_detection, detector_backend = detector_backend, return_region = True) #just emotion model expects grayscale images
+					img_224, region = functions.preprocess_face(img = img_path, target_size = (224, 224), grayscale = False, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, return_region = True) #just emotion model expects grayscale images
 				race_predictions = models['race'].predict(img_224)[0,:]
 				race_labels = ['asian', 'indian', 'black', 'white', 'middle eastern', 'latino hispanic']
 
@@ -467,7 +467,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
-def find_in_video(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+def find_in_video(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image like . 
 	These are the additional features :
@@ -476,18 +476,19 @@ def find_in_video(img_path, db_path, model_name ='VGG-Face', distance_metric = '
 	"""
 	return None
 
-def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 	"""
-	This function detects a face in an input image, and search for that person in a database.
+	This function detects a face in an input image, and searches for that person in a database.
 	More than 1 person is also handled. 
 	In the search, it relies on a .pkl file and creates one in case it wasn't created already.
 	The following is what differs from the old find function :
 		1) It supports a git api, so as when this function is called, it checks the git status to know whether to remove, rename, or add something to the pkl file because the user had made a similar change to the database. 
 		2) It supports automatic addition of new persons detected while running according the value of auto_add. Having e.g. 6 persons detected, if some of those weren't recognized, a new profile will be created in the database in a folder called "new", and it will contain a folder for each new person with some random name. 
 	"""
+
 	return None
 
-def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 
 	"""
 	This function applies verification several times and find an identity in a database
@@ -505,7 +506,7 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 			model = DeepFace.build_model('VGG-Face')
 
-		enforce_detection (boolean): The function throws exception if a face could not be detected. Set this to True if you don't want to get exception. This might be convenient for low resolution images.
+		hard_detection_failure (boolean): The function throws exception if a face could not be detected. Set this to True if you don't want to get exception. This might be convenient for low resolution images.
 
 		detector_backend (string): set face detector backend as retinaface, mtcnn, opencv, ssd or dlib
 
@@ -523,36 +524,11 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 	if os.path.isdir(db_path) == True:
 
-		if model == None:
-
-			if model_name == 'Ensemble':
-				print("Ensemble learning enabled")
-				models = Boosting.loadModel()
-
-			else: #model is not ensemble
-				model = build_model(model_name)
-				models = {}
-				models[model_name] = model
-
-		else: #model != None
-			print("Already built model is passed")
-
-			if model_name == 'Ensemble':
-				Boosting.validate_model(model)
-				models = model.copy()
-			else:
-				models = {}
-				models[model_name] = model
+		models = functions.get_models(build_model, model_name, model)
 
 		#---------------------------------------
 
-		if model_name == 'Ensemble':
-			model_names = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace']
-			metric_names = ['cosine', 'euclidean', 'euclidean_l2']
-		elif model_name != 'Ensemble':
-			model_names = []; metric_names = []
-			model_names.append(model_name)
-			metric_names.append(distance_metric)
+		model_names, metric_names = functions.get_model_and_metric_names(model_name, distance_metric)
 
 		#---------------------------------------
 
@@ -569,159 +545,13 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 			print("There are ", len(representations)," representations found in ",file_name)
 
 		else: #create representation.pkl from scratch
-			employees = []
-
-			for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
-				for file in f:
-					if ('.jpg' in file.lower()) or ('.png' in file.lower()):
-						exact_path = r + "/" + file
-						employees.append(exact_path)
-
-			if len(employees) == 0:
-				raise ValueError("There is no image in ", db_path," folder! Validate .jpg or .png files exist in this path.")
-
-			#------------------------
-			#find representations for db images
-
-			representations = []
-
-			pbar = tqdm(range(0,len(employees)), desc='Finding representations', disable = prog_bar)
-
-			#for employee in employees:
-			for index in pbar:
-				employee = employees[index]
-
-				instance = []
-				instance.append(employee)
-
-				for j in model_names:
-					custom_model = models[j]
-
-					representation = represent(img_path = employee
-						, model_name = model_name, model = custom_model
-						, enforce_detection = enforce_detection, detector_backend = detector_backend
-						, align = align
-						, normalization = normalization
-						)
-
-					instance.append(representation)
-
-				#-------------------------------
-
-				representations.append(instance)
-
-			f = open(db_path+'/'+file_name, "wb")
-			pickle.dump(representations, f)
-			f.close()
-
-			print("Representations stored in ",db_path,"/",file_name," file. Please delete this file when you add new identities in your database.")
-
+			representations = functions.create_representation_file(file_name, model_names, models, db_path = db_path, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization)
 		#----------------------------
 		#now, we got representations for facial database
 
-		if model_name != 'Ensemble':
-			df = pd.DataFrame(representations, columns = ["identity", "%s_representation" % (model_name)])
-		else: #ensemble learning
+		df = functions.get_df(representations, model_names, model_name = model_name)
 
-			columns = ['identity']
-			[columns.append('%s_representation' % i) for i in model_names]
-
-			df = pd.DataFrame(representations, columns = columns)
-
-		df_base = df.copy() #df will be filtered in each img. we will restore it for the next item.
-
-		resp_obj = []
-
-		global_pbar = tqdm(range(0, len(img_paths)), desc='Analyzing', disable = prog_bar)
-		for j in global_pbar:
-			img_path = img_paths[j]
-
-			#find representation for passed image
-
-			for j in model_names:
-				custom_model = models[j]
-
-				target_representation = represent(img_path = img_path
-					, model_name = model_name, model = custom_model
-					, enforce_detection = enforce_detection, detector_backend = detector_backend
-					, align = align
-					, normalization = normalization
-					)
-
-				for k in metric_names:
-					distances = []
-					for index, instance in df.iterrows():
-						source_representation = instance["%s_representation" % (j)]
-
-						if k == 'cosine':
-							distance = dst.findCosineDistance(source_representation, target_representation)
-						elif k == 'euclidean':
-							distance = dst.findEuclideanDistance(source_representation, target_representation)
-						elif k == 'euclidean_l2':
-							distance = dst.findEuclideanDistance(dst.l2_normalize(source_representation), dst.l2_normalize(target_representation))
-
-						distances.append(distance)
-
-					#---------------------------
-
-					if model_name == 'Ensemble' and j == 'OpenFace' and k == 'euclidean':
-						continue
-					else:
-						df["%s_%s" % (j, k)] = distances
-
-						if model_name != 'Ensemble':
-							threshold = dst.findThreshold(j, k)
-							df = df.drop(columns = ["%s_representation" % (j)])
-							df = df[df["%s_%s" % (j, k)] <= threshold]
-
-							df = df.sort_values(by = ["%s_%s" % (j, k)], ascending=True).reset_index(drop=True)
-
-							resp_obj.append(df)
-							df = df_base.copy() #restore df for the next iteration
-
-			#----------------------------------
-
-			if model_name == 'Ensemble':
-
-				feature_names = []
-				for j in model_names:
-					for k in metric_names:
-						if model_name == 'Ensemble' and j == 'OpenFace' and k == 'euclidean':
-							continue
-						else:
-							feature = '%s_%s' % (j, k)
-							feature_names.append(feature)
-
-				#print(df.head())
-
-				x = df[feature_names].values
-
-				#--------------------------------------
-
-				boosted_tree = Boosting.build_gbm()
-
-				y = boosted_tree.predict(x)
-
-				verified_labels = []; scores = []
-				for i in y:
-					verified = np.argmax(i) == 1
-					score = i[np.argmax(i)]
-
-					verified_labels.append(verified)
-					scores.append(score)
-
-				df['verified'] = verified_labels
-				df['score'] = scores
-
-				df = df[df.verified == True]
-				#df = df[df.score > 0.99] #confidence score
-				df = df.sort_values(by = ["score"], ascending=False).reset_index(drop=True)
-				df = df[['identity', 'verified', 'score']]
-
-				resp_obj.append(df)
-				df = df_base.copy() #restore df for the next iteration
-
-			#----------------------------------
+		resp_obj = functions.get_find_result(df, represent, img_paths, model_names, models, metric_names, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization, prog_bar = prog_bar)
 
 		toc = time.time()
 
@@ -737,7 +567,7 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 	return None
 
-def represent(img_path, model_name = 'VGG-Face', model = None, enforce_detection = True, detector_backend = 'opencv', align = True, normalization = 'base'):
+def represent(img_path, model_name = 'VGG-Face', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base'):
 
 	"""
 	This function represents facial images as vectors.
@@ -751,7 +581,7 @@ def represent(img_path, model_name = 'VGG-Face', model = None, enforce_detection
 
 			model = DeepFace.build_model('VGG-Face')
 
-		enforce_detection (boolean): If any face could not be detected in an image, then verify function will return exception. Set this to False not to have this exception. This might be convenient for low resolution images.
+		hard_detection_failure (boolean): If any face could not be detected in an image, then verify function will return exception. Set this to False not to have this exception. This might be convenient for low resolution images.
 
 		detector_backend (string): set face detector backend as retinaface, mtcnn, opencv, ssd or dlib
 
@@ -772,7 +602,7 @@ def represent(img_path, model_name = 'VGG-Face', model = None, enforce_detection
 	#detect and align
 	img = functions.preprocess_face(img = img_path
 		, target_size=(input_shape_y, input_shape_x)
-		, enforce_detection = enforce_detection
+		, hard_detection_failure = hard_detection_failure
 		, detector_backend = detector_backend
 		, align = align)
 
@@ -822,7 +652,7 @@ def stream(db_path = '', model_name ='VGG-Face', detector_backend = 'opencv', di
 						, source = source, time_threshold = time_threshold, frame_threshold = frame_threshold)
 
 
-def detectFace(img_path, detector_backend = 'opencv', enforce_detection = True, align = True):
+def detectFace(img_path, detector_backend = 'opencv', hard_detection_failure = True, align = True):
 
 	"""
 	This function applies pre-processing stages of a face recognition pipeline including detection and alignment
@@ -837,7 +667,7 @@ def detectFace(img_path, detector_backend = 'opencv', enforce_detection = True, 
 	"""
 
 	img = functions.preprocess_face(img = img_path, detector_backend = detector_backend
-		, enforce_detection = enforce_detection, align = align)[0] #preprocess_face returns (1, 224, 224, 3)
+		, hard_detection_failure = hard_detection_failure, align = align)[0] #preprocess_face returns (1, 224, 224, 3)
 	return img[:, :, ::-1] #bgr to rgb
 
 #---------------------------

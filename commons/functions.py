@@ -23,8 +23,13 @@ elif tf_major_version == 2:
 	from tensorflow.keras.applications.imagenet_utils import preprocess_input
 	from tensorflow.keras.preprocessing import image
 
+from deepface.basemodels import Boosting
 from git import Repo
 import time
+
+from tqdm import tqdm
+import pickle
+from deepface.commons import distance as dst
 #--------------------------------------------------
 
 def initialize_input(img1_path, img2_path = None):
@@ -86,16 +91,13 @@ def load_image(img):
 
 	return img
 
-def detect_face(img, detector_backend = 'opencv', grayscale = False, enforce_detection = True, align = True):
+def detect_face(img, detector_backend = 'opencv', grayscale = False, hard_detection_failure = True, align = True):
 
 	img_region = [0, 0, img.shape[0], img.shape[1]]
 
 	#----------------------------------------------
 	#people would like to skip detection and alignment if they already have pre-processed images
 	if detector_backend == 'skip':
-		#Added by Youssef
-		#print("detector_backend is set to skip")
-		#End adding by Youssef		
 		return img, img_region
 
 	#----------------------------------------------
@@ -107,33 +109,17 @@ def detect_face(img, detector_backend = 'opencv', grayscale = False, enforce_det
 
 	try:
 		detected_face, img_region = FaceDetector.detect_face(face_detector, detector_backend, img, align)
-		#Added by Youssef
-		#print("detected_face, img_region ", detected_face, img_region)
-		#End adding by Youssef
 	except: #if detected face shape is (0, 0) and alignment cannot be performed, this block will be run
-		#Added by Youssef
-		#print("detected_face is None")
-		#End adding by Youssef		
 		detected_face = None
 
 	if (isinstance(detected_face, np.ndarray)):
-		#Added by Youssef
-		#print("isinstance(detected_face, np.ndarray) is true")
-		#print("detected_face, img_region ", detected_face, img_region)
-		#End adding by Youssef
 		return detected_face, img_region
 	else:
 		if detected_face == None:
-			if enforce_detection != True:
-				#Added by Youssef
-				#print("detected_face is none and enforce_detection is not true")
-				#End adding by Youssef
+			if hard_detection_failure != True:
 				return img, img_region
 			else:
-				#Added by Youssef
-				#print("detected_face is none and enforce_detection is true")
-				#End adding by Youssef
-				raise ValueError("Face could not be detected. Please confirm that the picture is a face photo or consider to set enforce_detection param to False.")
+				raise ValueError("Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.")
 
 def normalize_input(img, normalization = 'base'):
 
@@ -181,17 +167,17 @@ def normalize_input(img, normalization = 'base'):
 
 	return img
 
-def preprocess_face(img, target_size=(224, 224), grayscale = False, enforce_detection = True, detector_backend = 'opencv', return_region = False, align = True):
+def preprocess_face(img, target_size=(224, 224), grayscale = False, hard_detection_failure = True, detector_backend = 'opencv', return_region = False, align = True):
 
 	#img might be path, base64 or numpy array. Convert it to numpy whatever it is.
 	img = load_image(img)
 	base_img = img.copy()
 
-	img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, enforce_detection = enforce_detection, align = align)
+	img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, hard_detection_failure = hard_detection_failure, align = align)
 
 	if img.shape[0] == 0 or img.shape[1] == 0:
-		if enforce_detection == True:
-			raise ValueError("Detected face shape is ", img.shape,". Consider to set enforce_detection argument to False.")
+		if hard_detection_failure == True:
+			raise ValueError("Detected face shape is ", img.shape,". Consider to set hard_detection_failure argument to False.")
 		else: #restore base image
 			img = base_img.copy()
 
@@ -268,6 +254,42 @@ def find_input_shape(model):
 
 	return input_shape
 
+def get_models(build_model, model_name ='VGG-Face', model = None):
+	if model == None:
+
+		if model_name == 'Ensemble':
+			print("Ensemble learning enabled")
+			models = Boosting.loadModel()
+
+		else: #model is not ensemble
+			model = build_model(model_name)
+			models = {}
+			models[model_name] = model
+
+	else: #model != None
+		print("Already built model is passed")
+
+		if model_name == 'Ensemble':
+			Boosting.validate_model(model)
+			models = model.copy()
+		else:
+			models = {}
+			models[model_name] = model
+	
+	return models
+
+def get_model_and_metric_names(model_name = 'VGG-Face', distance_metric = 'cosine'):
+
+	if model_name == 'Ensemble':
+		model_names = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace']
+		metric_names = ['cosine', 'euclidean', 'euclidean_l2']
+	elif model_name != 'Ensemble':
+		model_names = []; metric_names = []
+		model_names.append(model_name)
+		metric_names.append(distance_metric)
+	
+	return (model_names, metric_names)
+
 def check_change(db_path="."): #this whole function can be called in its own thread
 	#User might add an image to his database, might rename, move, delete, etc...
 	try:
@@ -275,7 +297,7 @@ def check_change(db_path="."): #this whole function can be called in its own thr
 	except Exception:
 		repo = Repo.init(db_path, bare=False) #initializing
 	
-	img_type = (".jpeg",".jpg",".png")
+	img_type = (".jpeg", ".jpg", ".png", ".bmp")
 	#check for untracked files
 	to_be_added_images_list = []
 	for f in repo.untracked_files: 
@@ -309,9 +331,167 @@ def check_change(db_path="."): #this whole function can be called in its own thr
 		commit = True
 		#removing images
 		try:
-        repo.index.remove(to_be_removed_images_list) #it removes the file after being added or even committed, then it returns it back to being untracked if it ever existed again, I guess
+			repo.index.remove(to_be_removed_images_list) #it removes the file after being added or even committed, then it returns it back to being untracked if it ever existed again, I guess
 		except Exception as err:
 			print("Git error while adding untracked file(s)", err)
 	#committing 
 	if(commit):
 		repo.index.commit("commit at " + time.ctime().replace(" ", "_"))
+
+
+def create_representation_file(file_name, model_names, models, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base'):
+	employees = []
+
+	for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
+		for file in f:
+			if ('.jpg' in file.lower()) or ('.png' in file.lower()):
+				exact_path = r + "/" + file
+				employees.append(exact_path)
+
+	if len(employees) == 0:
+		raise ValueError("There is no image in ", db_path," folder! Validate .jpg or .png files exist in this path.")
+
+	#------------------------
+	#find representations for db images
+
+	representations = []
+
+	pbar = tqdm(range(0,len(employees)), desc='Finding representations', disable = prog_bar)
+
+	#for employee in employees:
+	for index in pbar:
+		employee = employees[index]
+
+		instance = []
+		instance.append(employee)
+
+		for j in model_names:
+			custom_model = models[j]
+
+			representation = represent(img_path = employee
+				, model_name = model_name, model = custom_model
+				, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend
+				, align = align
+				, normalization = normalization)
+
+			instance.append(representation)
+
+		#-------------------------------
+
+		representations.append(instance)
+
+	f = open(db_path+'/'+file_name, "wb")
+	pickle.dump(representations, f)
+	f.close()
+
+	print("Representations stored in ",db_path,"/",file_name," file. Please delete this file when you add new identities in your database.")
+	return representations
+
+def get_df(representations, model_names, model_name = 'VGG-Face'):
+	if model_name != 'Ensemble':
+		df = pd.DataFrame(representations, columns = ["identity", "%s_representation" % (model_name)])
+	else: #ensemble learning
+
+		columns = ['identity']
+		[columns.append('%s_representation' % i) for i in model_names]
+
+		df = pd.DataFrame(representations, columns = columns)
+	return df
+
+def get_find_result(df, represent, img_paths, model_names, models, metric_names, model_name  ='VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True):
+	df_base = df.copy() #df will be filtered in each img. we will restore it for the next item.
+
+	resp_obj = []
+
+	global_pbar = tqdm(range(0, len(img_paths)), desc='Analyzing', disable = prog_bar)
+	for j in global_pbar:
+		img_path = img_paths[j]
+
+		#find representation for passed image
+
+		for j in model_names:
+			custom_model = models[j]
+
+			target_representation = represent(img_path = img_path
+				, model_name = model_name, model = custom_model
+				, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend
+				, align = align
+				, normalization = normalization)
+			#print("target_representation list is : ", target_representation) #this is a vector of length 2622 in case of VGG-Face model_name
+			for k in metric_names:
+				distances = []
+				for index, instance in df.iterrows():
+					source_representation = instance["%s_representation" % (j)]
+
+					if k == 'cosine':
+						distance = dst.findCosineDistance(source_representation, target_representation)
+					elif k == 'euclidean':
+						distance = dst.findEuclideanDistance(source_representation, target_representation)
+					elif k == 'euclidean_l2':
+						distance = dst.findEuclideanDistance(dst.l2_normalize(source_representation), dst.l2_normalize(target_representation))
+					else :
+						raise Exception("Not a valid distance_metric")
+
+					distances.append(distance)
+
+				#---------------------------
+
+				if model_name == 'Ensemble' and j == 'OpenFace' and k == 'euclidean':
+					continue
+				else:
+					df["%s_%s" % (j, k)] = distances
+
+					if model_name != 'Ensemble':
+						threshold = dst.findThreshold(j, k)
+						df = df.drop(columns = ["%s_representation" % (j)])
+						df = df[df["%s_%s" % (j, k)] <= threshold]
+
+						df = df.sort_values(by = ["%s_%s" % (j, k)], ascending=True).reset_index(drop=True)
+
+						resp_obj.append(df)
+						df = df_base.copy() #restore df for the next iteration
+
+		#----------------------------------
+
+		if model_name == 'Ensemble':
+
+			feature_names = []
+			for j in model_names:
+				for k in metric_names:
+					if model_name == 'Ensemble' and j == 'OpenFace' and k == 'euclidean':
+						continue
+					else:
+						feature = '%s_%s' % (j, k)
+						feature_names.append(feature)
+
+			#print(df.head())
+
+			x = df[feature_names].values
+
+			#--------------------------------------
+
+			boosted_tree = Boosting.build_gbm()
+
+			y = boosted_tree.predict(x)
+
+			verified_labels = []; scores = []
+			for i in y:
+				verified = np.argmax(i) == 1
+				score = i[np.argmax(i)]
+
+				verified_labels.append(verified)
+				scores.append(score)
+
+			df['verified'] = verified_labels
+			df['score'] = scores
+
+			df = df[df.verified == True]
+			#df = df[df.score > 0.99] #confidence score
+			df = df.sort_values(by = ["score"], ascending=False).reset_index(drop=True)
+			df = df[['identity', 'verified', 'score']]
+
+			resp_obj.append(df)
+			df = df_base.copy() #restore df for the next iteration
+
+		#----------------------------------
+	return resp_obj

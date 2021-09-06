@@ -65,19 +65,14 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 		if(x.b_path.endswith(img_type)):#added in case someone messes with the repo, like adds something which isn't an image to the git staging area i.e. tracking it.
 			if(x.change_type == 'M'): #not sure how an image file could be modified, anyway
 				to_be_added_images_list.append(x.b_path)
+				to_be_removed_images_list.append(x.b_path) #this is in case 2 committed files interchanged their names together, so in a best effort manner they must both be removed, then they both must added
 			elif(x.change_type == 'D'):
 				to_be_removed_images_list.append(x.b_path)
 	#Although user might rename an image and it might be worthy to trace such thing, but it is not a direct process in git so postponed. A renamed file is deleted and made new when it comes to git and us.
 		
 	#Now staging images to make them ready for committing and to clear the staging area for future changes
 	commit = False
-	if(len(to_be_added_images_list) > 0):
-		#Attempting to add the files to the staging (committing) area in order to finally commit
-		commit = True
-		try:
-			repo.index.add(to_be_added_images_list) #images are now tracked and are in the committing area.
-		except Exception as err:
-			print("Git error while adding untracked file(s)", err)	
+	#below, removing is made on purpose before adding, for the sake of modified files which I made as belonging to both. Because a modified file must be committed as being added, not removed.
 	if(len(to_be_removed_images_list) > 0):
 		commit = True
 		#removing images
@@ -85,31 +80,43 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 			repo.index.remove(to_be_removed_images_list) #it removes the file after being added or even committed, then it returns it back to being untracked if it ever existed again, I guess
 		except Exception as err:
 			print("Git error while adding untracked file(s)", err)
+	if(len(to_be_added_images_list) > 0):
+		#Attempting to add the files to the staging (committing) area in order to finally commit
+		commit = True
+		try:
+			repo.index.add(to_be_added_images_list) #images are now tracked and are in the committing area.
+		except Exception as err:
+			print("Git error while adding untracked file(s)", err)	
+
 	#committing 
 	if(commit):
 		repo.index.commit("commit at " + time.ctime().replace(" ", "_"))
 	
 	return (to_be_added_images_list, to_be_removed_images_list)
 
-def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
-    #this is almost like the represent function in DeepFace module, but more fitting to the use case
+def update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
+	#if(len(removed_images_list)!=0):
+	for removed_image in removed_images_list: # processing removed images are made on purpose before added images, for the sake of modified files.
+		for i in range(len(embeddings)):					
+			if(embeddings[i][0] == removed_image):
+				embeddings.pop(i)
+				break # even if user has named 2 images in separate folders the same name, it still works since we deal with relative paths
+	if(len(added_images_list)!=0):#not needed but anyway.	
+		added_embeddings = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		embeddings.extend(added_embeddings)
+		embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
+	return embeddings
 
-	pbar = tqdm(range(0,len(employees)), position= 0)
-
-	embeddings = []
-	#for employee in employees:
-	for index in pbar:
-		exact_path = employee = employees[index] #it's a copy byval, not references
-		pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
-		embedding = []
-        
-		img_representation = represent(db_path +'/'+ employee, model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
-		
-		embedding.append(employee)
-		embedding.append(img_representation)
-		embeddings.append(embedding)
-	pbar.set_description("All embeddings found.")
-	
+def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png")):
+	#check git for possible user-made changes then commit
+	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
+	print("Supposed updates in database after last save to", pkl_path, "are :")
+	print("added images list :", added_images_list)
+	print("removed images list :", removed_images_list)
+	try:
+		embeddings = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+	except Exception as err:
+		print(err)
 	return embeddings
 
 def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact"):
@@ -131,6 +138,39 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					employees.append(path)
 					break
 	return employees
+
+def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
+    #this is almost like the represent function in DeepFace module, but more fitting to the use case
+
+	pbar = tqdm(range(0,len(employees)), position= 0)
+
+	embeddings = []
+	#for employee in employees:
+	for index in pbar:
+		employee = employees[index] #it's a copy byval, not references
+		pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
+		embedding = []
+		
+		try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
+			img_representation = represent(db_path +'/'+ employee, model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		except Exception as err:
+			#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
+			print("Could not detect a face in this image :", employee)
+			continue
+
+		embedding.append(employee)
+		embedding.append(img_representation)
+		embeddings.append(embedding)
+	pbar.set_description("All embeddings tried.")
+	
+	return embeddings
+
+
+def save_pkl(content = [], exact_path = "representations.pkl"):
+	print("Representations stored in ", exact_path, " file")
+	f = open(exact_path, "wb") #this makes a new file or completely overrides an existing one
+	pickle.dump(content, f)
+	f.close()
 
 def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".png")):
 	
@@ -172,12 +212,6 @@ def create_representation_file(file_name, model_names, models, represent, db_pat
 	print("Please delete the representations file when you add new identities in your database.")
 
 	return representations
-
-def save_pkl(content = [], exact_path = "representations.pkl"):
-	print("Representations stored in ", exact_path, " file")
-	f = open(exact_path, "wb") #this makes a new file or completely overrides an existing one
-	pickle.dump(content, f)
-	f.close()
 
 def get_df(representations, model_names, model_name = 'VGG-Face'):
 	if model_name != 'Ensemble':

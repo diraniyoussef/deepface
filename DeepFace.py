@@ -480,6 +480,7 @@ def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard
 	These are the additional features :
 	1) The git functionality runs at the start and upon user request as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database.
 	2) For each detected person there is a record showing when the person appeared and when he disappeared. It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons.
+	3) If hard_detection_failure is set to False code will add a bad image representation of the full image when no face is detected. But when set to True continue and no face is detected, user will be informed and code will make the representations of other useful images if existing.
 	"""
 	#check passed db folder exists
 	if os.path.isdir(db_path) == False:
@@ -521,33 +522,20 @@ def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard
 	file_name = file_name.replace("-", "_").lower()
 	pkl_path = db_path+"/"+file_name
 
+	embeddings = []
+
 	if path.exists(pkl_path):
 
 		print("Found existing embedding file", pkl_path)
-
-		f = open(db_path+'/'+file_name, 'rb')
-		embeddings = pickle.load(f)
-		f.close()
-		print("There are ", len(embeddings)," embeddings found in ",file_name)
-		
-		#check git for possible user-made changes then commit
-		added_images_list, removed_images_list = functions1.check_change(db_path = db_path, img_type = img_type)
-		print("Supposed modification after last save to", pkl_path, "are :")
-		print("added images list :", added_images_list)
-		print("removed images list :", removed_images_list)
 		try:
-			#if(len(removed_images_list)!=0):
-			for removed_image in removed_images_list:
-				for i in range(len(embeddings)):					
-					if(embeddings[i][0] == removed_image):
-						embeddings.pop(i)
-						break # even if user has named 2 images in separate folders the same name, it still works since we deal with relative paths
-			if(len(added_images_list)!=0):#not needed but anyway.	
-				added_embeddings = functions1.get_embeddings(added_images_list, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
-				embeddings.extend(added_embeddings)
-				embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
+			with open(db_path+'/'+file_name, 'rb') as f:
+				embeddings = pickle.load(f)
+				print("There are ", len(embeddings)," embeddings found in ",file_name)
 		except Exception as err:
-			print(err)
+			print(err)		
+		
+		#check git and update embeddings
+		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, img_type = img_type)
 
 		#Just about leaving the program we shall write changes to pickle file, since user or program may make changes to embeddings.
 
@@ -556,7 +544,7 @@ def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard
 		employees = functions1.get_employees(db_path, img_type, path_type = "relative")
 		
 		if len(employees) == 0:
-			embeddings = []
+			#embeddings = [] #redundant
 			auto_add = True
 			print("No images were found in the database, so images will be automatically added from video source.")
 		else:

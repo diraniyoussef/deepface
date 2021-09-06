@@ -14,13 +14,17 @@ import pickle
 
 from deepface.basemodels import VGGFace, OpenFace, Facenet, Facenet512, FbDeepFace, DeepID, DlibWrapper, ArcFace, Boosting
 from deepface.extendedmodels import Age, Gender, Race, Emotion
-from deepface.commons import functions, realtime, distance as dst
+from deepface.commons import functions, functions1, realtime, distance as dst
 
 import tensorflow as tf
 tf_version = int(tf.__version__.split(".")[0])
 if tf_version == 2:
 	import logging
 	tf.get_logger().setLevel(logging.ERROR)
+
+from deepface.detectors import FaceDetector
+import cv2
+import re
 
 def build_model(model_name):
 
@@ -443,11 +447,6 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 				resp_obj["region"] = {}
 				is_region_set = True
 				for i, parameter in enumerate(region_labels):
-					#Added by Youssef
-					#print(i, parameter)
-					#print(region)
-					#print("region[i] : ", region[i], type(region[i]))
-					#End adding by Youssef
 					resp_obj["region"][parameter] = int(region[i]) #int cast is for the exception - object of type 'float32' is not JSON serializable
 
 		#---------------------------------
@@ -467,13 +466,114 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
-def find_in_video(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
+def analyze_stream(db_path = '', auto_add = False, model_name ='VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', source = 0):
 	"""
-	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image like . 
+	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. if it's a live stream, it has the option of being recorded so that at replay time one can check the emotion continuously. 
+		auto_add is the option to check for faces that match the faces there in the database but won't write to it. While if set to True, it will add new encountered faces to it.
+		Having e.g. 6 persons detected, there would be an analysis to each and every one of them; we would have a table where the colomns are the name of those people
+	"""
+	return None
+
+def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', distance_metric = 'cosine', source = 0):
+	"""
+	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
 	1) The git functionality runs at the start and upon user request as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database.
 	2) For each detected person there is a record showing when the person appeared and when he disappeared. It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons.
 	"""
+	#check passed db folder exists
+	if os.path.isdir(db_path) == False:
+		print("Provided database is not a directory i.e. folder.\nStopping execution.")
+		return None
+	
+	#------------------------
+
+	print("Detector backend is ", detector_backend, ". Building face detector model...")
+	face_detector = FaceDetector.build_model(detector_backend)
+
+	#------------------------
+
+	print("Finding distance threshold...")
+	#tuned thresholds for model and metric pair
+	threshold = dst.findThreshold(model_name, distance_metric)
+
+	print("Building", model_name, "model...")
+	model = build_model(model_name)
+	print(model_name," is built")
+
+	input_shape = functions.find_input_shape(model)
+	input_shape_x = input_shape[0]; input_shape_y = input_shape[1]
+
+	#------------------------
+
+	text_color = (255,255,255)
+
+	employees = []
+	img_type = (".jpg", ".png")
+
+	#find embeddings for employee list
+
+	tic = time.time()
+
+	#-----------------------
+
+	file_name = "representations_%s.pkl" % (model_name)
+	file_name = file_name.replace("-", "_").lower()
+	pkl_path = db_path+"/"+file_name
+
+	if path.exists(pkl_path):
+
+		print("Found existing embedding file", pkl_path)
+
+		f = open(db_path+'/'+file_name, 'rb')
+		embeddings = pickle.load(f)
+		f.close()
+		print("There are ", len(embeddings)," embeddings found in ",file_name)
+		
+		#check git for possible user-made changes then commit
+		added_images_list, removed_images_list = functions1.check_change(db_path = db_path, img_type = img_type)
+		print("Supposed modification after last save to", pkl_path, "are :")
+		print("added images list :", added_images_list)
+		print("removed images list :", removed_images_list)
+		try:
+			#if(len(removed_images_list)!=0):
+			for removed_image in removed_images_list:
+				for i in range(len(embeddings)):					
+					if(embeddings[i][0] == removed_image):
+						embeddings.pop(i)
+						break # even if user has named 2 images in separate folders the same name, it still works since we deal with relative paths
+			if(len(added_images_list)!=0):#not needed but anyway.	
+				added_embeddings = functions1.get_embeddings(added_images_list, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+				embeddings.extend(added_embeddings)
+				embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
+		except Exception as err:
+			print(err)
+
+		#Just about leaving the program we shall write changes to pickle file, since user or program may make changes to embeddings.
+
+	else: #representation .pkl file to be later created from scratch
+		print(".pkl file wasn't found, so scrolling whole database for all images.")
+		employees = functions1.get_employees(db_path, img_type, path_type = "relative")
+		
+		if len(employees) == 0:
+			embeddings = []
+			auto_add = True
+			print("No images were found in the database, so images will be automatically added from video source.")
+		else:
+			employees.sort()
+			embeddings = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+
+		#commit in git. No need to check for user-made changes since we have checked all images just now, so check_change's return values aren't interesting.
+		functions1.check_change(db_path = db_path, img_type = img_type)
+
+	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
+	print(df)
+
+
+
+	
+	functions1.save_pkl(content = embeddings, exact_path = pkl_path)
+
 	return None
 
 def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
@@ -510,7 +610,7 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 		detector_backend (string): set face detector backend as retinaface, mtcnn, opencv, ssd or dlib
 
-		prog_bar (boolean): enable/disable a progress bar
+		prog_bar (boolean): enable/disable a progress bar. If set to True it disables.
 
 	Returns:
 		This function returns pandas data frame. If a list of images is passed to img_path, then it will return list of pandas data frame.
@@ -524,11 +624,11 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 	if os.path.isdir(db_path) == True:
 
-		models = functions.get_models(build_model, model_name, model)
+		models = functions1.get_models(build_model, model_name, model)
 
 		#---------------------------------------
 
-		model_names, metric_names = functions.get_model_and_metric_names(model_name, distance_metric)
+		model_names, metric_names = functions1.get_model_and_metric_names(model_name, distance_metric)
 
 		#---------------------------------------
 
@@ -545,13 +645,13 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 			print("There are ", len(representations)," representations found in ",file_name)
 
 		else: #create representation.pkl from scratch
-			representations = functions.create_representation_file(file_name, model_names, models, db_path = db_path, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization)
+			representations = functions1.create_representation_file(file_name, model_names, models, represent, db_path = db_path, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization, prog_bar = prog_bar, img_type = (".jpg", ".png"))
 		#----------------------------
 		#now, we got representations for facial database
 
-		df = functions.get_df(representations, model_names, model_name = model_name)
+		df = functions1.get_df(representations, model_names, model_name = model_name)
 
-		resp_obj = functions.get_find_result(df, represent, img_paths, model_names, models, metric_names, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization, prog_bar = prog_bar)
+		resp_obj = functions1.get_find_result(df, represent, img_paths, model_names, models, metric_names, model_name = model_name, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, normalization = normalization, prog_bar = prog_bar)
 
 		toc = time.time()
 
@@ -615,6 +715,30 @@ def represent(img_path, model_name = 'VGG-Face', model = None, hard_detection_fa
 
 	#represent
 	embedding = model.predict(img)[0].tolist()
+	#in realtime.analysis function it's 
+	#img_representation = model.predict(img)[0,:]
+
+	return embedding
+
+def quick_represent(img_path, model, target_size=(224, 224), hard_detection_failure = True, detector_backend = 'opencv', normalization = 'base'):
+
+	"""
+	This function is the same as "represent" but assuming model is built and input_shape is passed as argument. Comments within are important though.
+	"""
+
+	#detect and align
+	#preprocess_face returns single face. this is expected for source images in db.
+	img = functions.preprocess_face(img = img_path
+		, target_size = (target_size[0], target_size[1])
+		, hard_detection_failure = hard_detection_failure
+		, detector_backend = detector_backend
+		) #align is omitted so set to default in analysis function in realtime.py
+
+	#custom normalization. It wasn't originally part of analysis function in realtime.py
+	img = functions.normalize_input(img = img, normalization = normalization)
+
+	#represent
+	embedding = model.predict(img)[0,:]
 
 	return embedding
 

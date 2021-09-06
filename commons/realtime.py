@@ -1,4 +1,3 @@
-import os
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -11,8 +10,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 from deepface import DeepFace
 from deepface.extendedmodels import Age
-from deepface.commons import functions, realtime, distance as dst
+from deepface.commons import functions, distance as dst
 from deepface.detectors import FaceDetector
+
 
 def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', enable_face_analysis = True, source = 0, time_threshold = 5, frame_threshold = 5):
 
@@ -96,7 +96,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 		embedding = []
 
 		#preprocess_face returns single face. this is expected for source images in db.
-		img = functions.preprocess_face(img = employee, target_size = (input_shape_y, input_shape_x), enforce_detection = False, detector_backend = detector_backend)
+		img = functions.preprocess_face(img = employee, target_size = (input_shape_y, input_shape_x), hard_detection_failure = False, detector_backend = detector_backend)
 		img_representation = model.predict(img)[0,:]
 
 		embedding.append(employee)
@@ -202,7 +202,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 
 						if enable_face_analysis == True:
 
-							gray_img = functions.preprocess_face(img = custom_face, target_size = (48, 48), grayscale = True, enforce_detection = False, detector_backend = 'opencv')
+							gray_img = functions.preprocess_face(img = custom_face, target_size = (48, 48), grayscale = True, hard_detection_failure = False, detector_backend = 'opencv')
 							emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 							emotion_predictions = emotion_model.predict(gray_img)[0,:]
 							sum_of_predictions = emotion_predictions.sum()
@@ -280,7 +280,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 
 							#-------------------------------
 
-							face_224 = functions.preprocess_face(img = custom_face, target_size = (224, 224), grayscale = False, enforce_detection = False, detector_backend = 'opencv')
+							face_224 = functions.preprocess_face(img = custom_face, target_size = (224, 224), grayscale = False, hard_detection_failure = False, detector_backend = 'opencv')
 
 							age_predictions = age_model.predict(face_224)[0,:]
 							apparent_age = Age.findApparentAge(age_predictions)
@@ -335,7 +335,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 						#-------------------------------
 						#face recognition
 
-						custom_face = functions.preprocess_face(img = custom_face, target_size = (input_shape_y, input_shape_x), enforce_detection = False, detector_backend = 'opencv')
+						custom_face = functions.preprocess_face(img = custom_face, target_size = (input_shape_y, input_shape_x), hard_detection_failure = False, detector_backend = 'opencv')
 
 						#check preprocess_face function handled
 						if custom_face.shape[1:3] == input_shape:
@@ -464,11 +464,4 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 	#kill open cv things
 	cap.release()
 	cv2.destroyAllWindows()
-
-def analyze_stream(db_path = '', auto_add = False, model_name ='VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', source = 0):
-	"""
-	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. if it's a live stream, it has the option of being recorded so that at replay time one can check the emotion continuously. 
-		auto_add is the option to check for faces that match the faces there in the database but won't write to it. While if set to True, it will add new encountered faces to it.
-		Having e.g. 6 persons detected, there would be an analysis to each and every one of them; we would have a table where the colomns are the name of those people
-	"""
 	

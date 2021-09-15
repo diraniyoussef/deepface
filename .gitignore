@@ -1,0 +1,17 @@
+__pycache__/DeepFace.cpython-38.pyc
+DeepFace.py~
+Readme~
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+commons/functions.py~
+commons/realtime.py~
+commons/__pycache__/functions.cpython-38.pyc
+commons/__pycache__/functions1.cpython-38.pyc
+commons/__pycache__/realtime.cpython-38.pyc
+detectors/FaceDetector.py~
+detectors/OpenCvWrapper.py~
+.idea/deepface.iml
+.idea/.gitignore

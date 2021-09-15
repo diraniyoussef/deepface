@@ -706,6 +706,44 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	cv2.destroyAllWindows()
 	print("Done with play_with_annotations")
 
+def play_with_annotations(source, frames_info_path, window_name = "img"):
+	"""
+	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
+	source is the path to 
+	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
+	"""
+	f = open(frames_info_path, 'rb')
+	frames_info = pickle.load(f)
+
+	print("Playing the stream with annotations...")
+	frame_info_index = 0
+	frame_index = 0
+
+	cap = cv2.VideoCapture(source) #webcam or path to video file
+	
+	#if(frames_info is not None):
+	ret = True
+	while(not (cv2.waitKey(30) & 0xFF == ord('q')) and ret == True):
+		ret, img = cap.read() 
+
+		if img is None:
+			break
+		
+		# Extracting frames info...
+		if(frame_info_index < len(frames_info) and frames_info[frame_info_index]["frame_index"] == frame_index):
+			#the frames_info item of index frame_info_index has some face(s) inside
+			for face_info in frames_info[frame_info_index]["detected_faces"]:
+				functions1.face_inform(face_info, img)
+
+			frame_info_index += 1
+		
+		frame_index += 1
+		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
+		cv2.imshow(window_name,img)
+
+	cap.release()
+	cv2.destroyAllWindows()
+
 def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 	"""
 	This function detects a face in an input image, and searches for that person in a database.

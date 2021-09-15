@@ -160,7 +160,7 @@ def analysis(db_path, model_name = 'VGG-Face', detector_backend = 'opencv', dist
 
 				cv2.putText(img, str(frame_threshold - face_included_frames), (int(x+w/4),int(y+h/1.5)), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 255, 255), 2) #Youssef - 4 is like the scale, 2 is like the pixel size, (int(x+w/4),int(y+h/1.5)) tuple is the (right, down) translation where the bottom left of the text will be positioned.
 
-				detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face
+				detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face #Youssef- isn't this same as 'face' variable ? yes, if align was set to True 
 
 				#-------------------------------------
 

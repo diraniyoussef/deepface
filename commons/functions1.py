@@ -1,11 +1,22 @@
 import os
-from deepface.basemodels import Boosting
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import re
+
+import numpy as np
+import pandas as pd
+import cv2
+
 from git import Repo
 import time
 
 from tqdm import tqdm
 import pickle
+
+from deepface import DeepFace
+from deepface.basemodels import Boosting
 from deepface.commons import distance as dst, functions
+from deepface.detectors import FaceDetector
+
 
 def get_models(build_model, model_name ='VGG-Face', model = None):
 	if model == None:
@@ -19,7 +30,7 @@ def get_models(build_model, model_name ='VGG-Face', model = None):
 			models = {}
 			models[model_name] = model
 
-	else: #model != None
+	else: #model is not None
 		print("Already built model is passed")
 
 		if model_name == 'Ensemble':
@@ -70,6 +81,9 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 				to_be_removed_images_list.append(x.b_path)
 	#Although user might rename an image and it might be worthy to trace such thing, but it is not a direct process in git so postponed. A renamed file is deleted and made new when it comes to git and us.
 		
+	#TODO it's better not to track images that won't be accepted as faces...
+
+
 	#Now staging images to make them ready for committing and to clear the staging area for future changes
 	commit = False
 	#below, removing is made on purpose before adding, for the sake of modified files which I made as belonging to both. Because a modified file must be committed as being added, not removed.
@@ -167,10 +181,379 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 
 
 def save_pkl(content = [], exact_path = "representations.pkl"):
-	print("Representations stored in ", exact_path, " file")
+	print("Storing in ", exact_path, " file")
 	f = open(exact_path, "wb") #this makes a new file or completely overrides an existing one
 	pickle.dump(content, f)
 	f.close()
+
+def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, emotion_model = None, normalization = "base", img_type = (".jpg", ".png")):
+	"""
+	The output of this function is something like that :
+	[
+		{
+			frame_index: 0,
+			detected_faces: [
+				face_info1,
+				face_info2,
+				...
+			]
+		},
+		{
+			frame_index: 8, #it doesn't have to be that frame_index is successive since in-between-frames might not have any faces 
+			detected_faces: [
+				face_info1,
+				face_info2,
+				...
+			]
+		},
+		...
+	]
+	"""
+	frames_info = []
+	frame_index = 0
+	
+	video_frames_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+	if(video_frames_length != -1): #it's -1 if source was 0 (built-in camera)
+		pbar = tqdm(range(0, video_frames_length), position= 0)
+	
+	ret = True
+	while(not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True):	
+		ret, img = cap.read() 
+		
+		if img is None:
+			break
+		
+		pbar.set_description("Processing frame %s " % frame_index)
+		
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		if(frame_info is not None):
+			frames_info.append(frame_info)
+		
+		frame_index += 1
+		pbar.update()
+	
+	pbar.set_description("Done frames processing.")
+
+	return frames_info
+
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, emotion_model = None, normalization = 'base', img_type = (".jpg", ".png")):
+	face_detected = False
+	
+	resolution = img.shape 
+
+	faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = align)
+	
+	detected_faces = []
+	frame_info = {"frame_index": frame_index}
+	for face, (x, y, w, h) in faces:
+		#if w > 130: #discard small detected faces				
+
+		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add)
+
+		if(not process_only): #show the rectangles and texts without returning them.
+			if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
+				face_inform(face_info, img)
+		else:
+			#get the rectangles and texts then return them. We won't show them now.
+			detected_faces.append(face_info)
+			
+	if(process_only): 
+		if(detected_faces == []):
+			return None
+		else:			
+			frame_info["detected_faces"] = detected_faces
+			return frame_info
+
+def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".png"), auto_add = False):
+	"""
+	This will return everything related to the detected face.
+	'face' parameter is a numpy array of a cropped face
+	face_info = {
+		"cropped_array": face, #this "cropped_array" key-value is omitted since it makes the pkl file enormously huge
+		"pos_dim": (x, y, w, h),
+		"mood": [
+			['Angry', percentage], 
+			['Disgust', percentage], 
+			['Fear', percentage], 
+			['Happy', percentage], 
+			['Sad', percentage], 
+			['Surprise', percentage], 
+			['Neutral', percentage]
+		],
+		"representation": e.g. array([ 0.00743464,  0.00669238, -0.00143091, ...,  0.00044229,
+        0.01007347,  0.03110152], dtype=float32), #can be omitted to save space when saving the pkl file
+		"most_similar": {
+			"name": employee_name,
+			"relative_path": employee_relative_path,
+			"distance": best_distance
+		}
+	}
+	"""
+	#detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face #Youssef- isn't this same as 'face' variable? yes, if align was set to True 
+	detected_face = face
+	(x, y, w, h) = pos_dim
+	resolution_x = resolution[1]; resolution_y = resolution[0]
+
+	#pivot_img_size = 112 #face recognition result image
+	face_info = {
+		#"cropped_array": face,
+		"pos_dim": (x, y, w, h),
+	}
+
+	#process emotion
+	if(emotion_model is not None):
+		mood_items = get_emotions(detected_face, emotion_model, detector_backend = detector_backend)
+		face_info["mood"] = mood_items
+
+	#-------------------------------
+	#face recognition
+
+	face = functions.preprocess_face(img = face, target_size = (target_size[0], target_size[1]), hard_detection_failure = False, detector_backend = detector_backend)
+	
+	#custom normalization. It wasn't originally part of analysis function in realtime.py
+	face = functions.normalize_input(img = face, normalization = normalization)
+
+	input_shape = (target_size[1], target_size[0])
+	#check preprocess_face function handled
+	if(face.shape[1:3] == input_shape and df.shape[0] > 0): #if there are images to verify, apply face recognition
+		target_representation = model.predict(face)[0,:]
+		#face_info["representation"] = target_representation
+		employee_name, employee_relative_path, best_distance = get_most_similar_candidate(df, target_representation, threshold, img_type = img_type)
+		face_info["most_similar"] = {
+			"name": employee_name,
+			"relative_path": employee_relative_path,
+			"distance": best_distance
+		}
+		if(employee_name == "" and auto_add): #save face to database and add it to embeddings
+			#TODO			
+			pass
+
+	return face_info
+
+def get_most_similar_candidate(df, face_representation, threshold, img_type = (".jpg", ".png")):
+	"""
+	Our convention is to return an empty name string in case no close person to our target face was detected in the database 
+	"""
+	def findDistance(row):
+		distance_metric = row['distance_metric']
+		db_img_representation = row['embedding']
+
+		distance = 1000 #initialize very large value
+		if distance_metric == 'cosine':
+			distance = dst.findCosineDistance(face_representation, db_img_representation)
+		elif distance_metric == 'euclidean':
+			distance = dst.findEuclideanDistance(face_representation, db_img_representation)
+		elif distance_metric == 'euclidean_l2':
+			distance = dst.findEuclideanDistance(dst.l2_normalize(face_representation), dst.l2_normalize(db_img_representation))
+		return distance
+
+	df['distance'] = df.apply(findDistance, axis = 1)
+	df = df.sort_values(by = ["distance"])
+
+	candidate = df.iloc[0]
+	employee_relative_path = candidate['employee']
+	best_distance = candidate['distance']
+
+	#print(candidate[['employee', 'distance']].values)
+
+	if best_distance <= threshold:
+		#label = re.sub('([0-9]|.jpg|.png)', '', employee_relative_path.split("/")[-1])
+		label = employee_relative_path
+		for extension in img_type: #removing .jpg or .png
+			label = label.split("/")[-1].replace(extension, "")
+		label = re.sub('[0-9]', '', label) #sustitutes any number in the name by a no char, i.e. removes it even if it was repeated anywhere
+		label = re.sub('[\- _]*$', '', label) #removes any dash. space, or underscrore found only at the end of the name
+	else:
+		label = "" #no one in the database is considered matching "face"
+	
+	return label, employee_relative_path, best_distance
+		
+def face_inform(face_info, img): #face_info represents only 1 face
+	"""
+	This will show using cv2 the rectangles and texts after extracting them from face_info. 
+	It won't return anything.
+	"""
+	(x, y, w, h) = face_info["pos_dim"]
+	cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image
+	
+	#-------------------------------
+	#transparency
+	"""
+	overlay = img.copy()
+	opacity = 0.4
+	pivot_img_size = 112 #face recognition result image
+	resolution = img.shape; resolution_x = resolution[1]; resolution_y = resolution[0]
+
+	if x+w+pivot_img_size < resolution_x:
+		#right
+		cv2.rectangle(img
+			#, (x+w,y+20)
+			, (x+w,y)
+			, (x+w+pivot_img_size, y+h)
+			, (64,64,64),cv2.FILLED)
+
+		cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
+
+	elif x-pivot_img_size > 0:
+		#left
+		cv2.rectangle(img
+			#, (x-pivot_img_size,y+20)
+			, (x-pivot_img_size,y)
+			, (x, y+h)
+			, (64,64,64),cv2.FILLED)
+
+		cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
+	"""
+	#-------------------------------
+	#emotion
+	mood_items = face_info.get("mood")
+	if(mood_items is not None):
+		emotion_df = pd.DataFrame(mood_items, columns = ["emotion", "score"])
+		emotion_df = emotion_df.sort_values(by = ["score"], ascending=False).reset_index(drop=True)
+
+		#show only main emotion
+		main_emotion = emotion_df.iloc[0]
+
+		emotion_label = "%s " % (main_emotion['emotion'])
+		
+		text_location_y = y + h
+		text_location_x = x
+
+		cv2.putText(img, emotion_label, (text_location_x, text_location_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+		"""
+		for index, instance in emotion_df.iterrows():
+			emotion_label = "%s " % (instance['emotion'])
+			emotion_score = instance['score']/100
+
+			bar_x = 35 #this is the size if an emotion is 100%
+			bar_x = int(bar_x * emotion_score)
+
+			if x+w+pivot_img_size < resolution_x:
+
+				text_location_y = y + 20 + (index+1) * 20
+				text_location_x = x+w
+
+				if text_location_y < y + h:
+					cv2.putText(img, emotion_label, (text_location_x, text_location_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+					cv2.rectangle(img
+						, (x+w+70, y + 13 + (index+1) * 20)
+						, (x+w+70+bar_x, y + 13 + (index+1) * 20 + 5)
+						, (255,255,255), cv2.FILLED)
+
+			#elif x-pivot_img_size > 0:
+			else:
+				text_location_y = y + 20 + (index+1) * 20
+				text_location_x = x-pivot_img_size
+
+				if text_location_y <= y+h:
+					cv2.putText(img, emotion_label, (text_location_x, text_location_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+					cv2.rectangle(img
+						, (x-pivot_img_size+70, y + 13 + (index+1) * 20)
+						, (x-pivot_img_size+70+bar_x, y + 13 + (index+1) * 20 + 5)
+						, (255,255,255), cv2.FILLED)
+		"""
+	
+	#-------------------------------
+	#face recognition
+	most_similar = face_info.get("most_similar")
+	if(most_similar is not None):
+		name = most_similar["name"]
+		#print(name)		
+		if(name != ""):
+			"""
+			display_img = cv2.imread(name)
+
+			display_img = cv2.resize(display_img, (pivot_img_size, pivot_img_size))
+
+			try:
+				if y - pivot_img_size > 0 and x + w + pivot_img_size < resolution_x:
+					#top right
+					freeze_img[y - pivot_img_size:y, x+w:x+w+pivot_img_size] = display_img
+
+					overlay = freeze_img.copy(); opacity = 0.4
+					cv2.rectangle(freeze_img,(x+w,y),(x+w+pivot_img_size, y+20),(46,200,255),cv2.FILLED)
+					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
+
+					cv2.putText(freeze_img, label, (x+w, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+					#connect face and text
+					cv2.line(freeze_img,(x+int(w/2), y), (x+3*int(w/4), y-int(pivot_img_size/2)),(67,67,67),1)
+					cv2.line(freeze_img, (x+3*int(w/4), y-int(pivot_img_size/2)), (x+w, y - int(pivot_img_size/2)), (67,67,67),1)
+
+				elif y + h + pivot_img_size < resolution_y and x - pivot_img_size > 0:
+					#bottom left
+					freeze_img[y+h:y+h+pivot_img_size, x-pivot_img_size:x] = display_img
+
+					overlay = freeze_img.copy(); opacity = 0.4
+					cv2.rectangle(freeze_img,(x-pivot_img_size,y+h-20),(x, y+h),(46,200,255),cv2.FILLED)
+					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
+
+					cv2.putText(freeze_img, label, (x - pivot_img_size, y+h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+					#connect face and text
+					cv2.line(freeze_img,(x+int(w/2), y+h), (x+int(w/2)-int(w/4), y+h+int(pivot_img_size/2)),(67,67,67),1)
+					cv2.line(freeze_img, (x+int(w/2)-int(w/4), y+h+int(pivot_img_size/2)), (x, y+h+int(pivot_img_size/2)), (67,67,67),1)
+
+				elif y - pivot_img_size > 0 and x - pivot_img_size > 0:
+					#top left
+					freeze_img[y-pivot_img_size:y, x-pivot_img_size:x] = display_img
+
+					overlay = freeze_img.copy(); opacity = 0.4
+					cv2.rectangle(freeze_img,(x- pivot_img_size,y),(x, y+20),(46,200,255),cv2.FILLED)
+					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
+
+					cv2.putText(freeze_img, label, (x - pivot_img_size, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+					#connect face and text
+					cv2.line(freeze_img,(x+int(w/2), y), (x+int(w/2)-int(w/4), y-int(pivot_img_size/2)),(67,67,67),1)
+					cv2.line(freeze_img, (x+int(w/2)-int(w/4), y-int(pivot_img_size/2)), (x, y - int(pivot_img_size/2)), (67,67,67),1)
+
+				elif x+w+pivot_img_size < resolution_x and y + h + pivot_img_size < resolution_y:
+					#bottom righ
+					freeze_img[y+h:y+h+pivot_img_size, x+w:x+w+pivot_img_size] = display_img
+
+					overlay = freeze_img.copy(); opacity = 0.4
+					cv2.rectangle(freeze_img,(x+w,y+h-20),(x+w+pivot_img_size, y+h),(46,200,255),cv2.FILLED)
+					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
+
+					cv2.putText(freeze_img, label, (x+w, y+h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+					#connect face and text
+					cv2.line(freeze_img,(x+int(w/2), y+h), (x+int(w/2)+int(w/4), y+h+int(pivot_img_size/2)),(67,67,67),1)
+					cv2.line(freeze_img, (x+int(w/2)+int(w/4), y+h+int(pivot_img_size/2)), (x+w, y+h+int(pivot_img_size/2)), (67,67,67),1)
+			except Exception as err:
+				print(str(err))
+			"""	
+			cv2.putText(img, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
+		
+	
+	pass
+
+def get_emotions(face, emotion_model, detector_backend = 'opencv'):
+	gray_img = functions.preprocess_face(img = face, target_size = (48, 48), grayscale = True, hard_detection_failure = False, detector_backend = 'opencv')
+	emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+	emotion_predictions = emotion_model.predict(gray_img)[0,:]
+	sum_of_predictions = emotion_predictions.sum()
+
+	mood_items = []
+	for i in range(0, len(emotion_labels)):
+		mood_item = []
+		emotion_label = emotion_labels[i]
+		emotion_prediction = 100 * emotion_predictions[i] / sum_of_predictions
+		mood_item.append(emotion_label)
+		mood_item.append(emotion_prediction)
+		mood_items.append(mood_item)
+
+	return mood_items
+	
+def print_license():
+	#license to thank Mr. Sefik Ilkin Serengil for his wonderful work which he made available on Github. It's mandatory to put the license, and I hope I can pay him back...
+	print("MIT License\n\nCopyright (c) 2019 Sefik Ilkin Serengil\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
+	print("\n\nEnd of license\n\n")
+	print("We note that further development has been made to cutomize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n\n")
+	pass
 
 def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".png")):
 	
@@ -208,6 +591,7 @@ def create_representation_file(file_name, model_names, models, represent, db_pat
 
 		representations.append(instance)
 
+	print("Saving Representations...")
 	save_pkl(representations, db_path+'/'+file_name)
 	print("Please delete the representations file when you add new identities in your database.")
 

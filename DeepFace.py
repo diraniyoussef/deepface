@@ -25,6 +25,7 @@ if tf_version == 2:
 from deepface.detectors import FaceDetector
 import cv2
 import re
+import threading
 
 def build_model(model_name):
 
@@ -466,22 +467,55 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
-def analyze_stream(db_path = '', auto_add = False, model_name ='VGG-Face', detector_backend = 'opencv', distance_metric = 'cosine', source = 0):
-	"""
-	This function applies face recognition to a stream. Preferrably offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. if it's a live stream, it has the option of being recorded so that at replay time one can check the emotion continuously. 
-		auto_add is the option to check for faces that match the faces there in the database but won't write to it. While if set to True, it will add new encountered faces to it.
-		Having e.g. 6 persons detected, there would be an analysis to each and every one of them; we would have a table where the colomns are the name of those people
-	"""
-	return None
 
-def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', distance_metric = 'cosine', source = 0):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', hard_detection_failure = False, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
-	1) The git functionality runs at the start and upon user request as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database.
-	2) For each detected person there is a record showing when the person appeared and when he disappeared. It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons.
-	3) If hard_detection_failure is set to False code will add a bad image representation of the full image when no face is detected. But when set to True continue and no face is detected, user will be informed and code will make the representations of other useful images if existing.
+	1) The git functionality runs at the start and upon user request, according to a GUI button or maybe a listener to a text file change event, as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database. 
+	2) If hard_detection_failure is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
+	3) When process_only is True we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
+	This pkl file is useful to replay smoothly (play_with_annotations function) with some limited info like name and main emotion, as well to make statistics. E.g. we can trace a particular person when he appeared and when he disappeared. It's useful for recognition as well for emotion analysis, e.g. we can track when a particular person was happy with which persons, or e.g. what is the average of each emotion for a particular person or the average of emotions for all persons. Having e.g. 6 persons detected, there can be an analysis to each and every one of them [old: we would have a table where the colomns are the name of those people]
+	This pkl file is a list of dictionarie, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
+	N.B: Some statistics cannot be exaggerated with their result, since we only get (for now at least) from 1 camera and it won't show a target person all the time, besides, this emotion recognition lacks continuity, e.g. I suspect that it will detect happiness while the person is actually feeling bad, but still it holds some valuable info, like e.g. how long can a person maintain an "apparent" feeling.
+	4) If actions = [] then this function only applies face recognition to a stream. We check each and every frame for recognition only. If actions = ['emotion'] then preferrably be it an offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. Anyway we have the option, probably in another function, of being recorded so that at replay time one can check the emotions continuously. 
+	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons. 
+	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
+	7) source can be an YouTube video. --TODO
+	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Even later we can use distribute processes on multiple computers. TODO
+	
+
+	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', hard_detection_failure = True, source = '/home/youssef/videos/hi.mp4')
+
+
+	#TODO
+	know why some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from ?
+
+	test how small an image can be in order to be recognized. And when a face is near the edge, it doesn't probably detect it, how to fix it ?
+
+	test fidelity of the recognition in case a person is totally turning his head right or left
+
+	test later some file formats in the database like .bmp, .png, .tiff... Will they work and be reliable ?
+
+	test if 2 or more persons appear in the video, will it perform right ?
+
+	add the timing to each frame of frames_info in the pkl file
+
+	use auto_add to get a panoramic set of profile images of a particular person if that helps in recognition.
+
+	launch it from the terminal or the cmd prompt
+
+	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.
+	
+	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
+
 	"""
+	functions1.print_license()
+
+	#inform about the time
+	start_time = time.ctime()
+	print(start_time)
+
 	#check passed db folder exists
 	if os.path.isdir(db_path) == False:
 		print("Provided database is not a directory i.e. folder.\nStopping execution.")
@@ -555,14 +589,122 @@ def find_in_stream(db_path = '.', auto_add = False, model_name ='VGG-Face', hard
 		functions1.check_change(db_path = db_path, img_type = img_type)
 
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
+	df['distance_metric'] = distance_metric
 	print(df)
+	
+	emotion_model = None
+	if("emotion" in actions):
+		print("Building emotion model...")
+		emotion_model = build_model('Emotion')
+		print("Emotion model loaded")
 
+	cap = cv2.VideoCapture(source) #webcam or path to video file
 
+	if(not process_only):	
+		#here we think realtime		
+		
+		global frame_index	#in multithreading accessing this variable by another thread is reliable I guess https://stackoverflow.com/questions/53780267/an-equivalent-to-java-volatile-in-python
+		frame_index = 0
 
+		print("Attempting to play the stream with annotations...\nPress q to abort")
+
+		ret = True
+		while(not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True): 
+			ret, img = cap.read() 
+
+			if img is None:
+				break
+			
+			frame_index += 1
+			print(frame_index)
+	
+			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
+
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={"detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "emotion_model": emotion_model, "normalization": normalization, "img_type": (".jpg", ".png")}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			cv2.imshow('img',img)
+		
+	else: #process_only
+		tic = time.time()
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = (".jpg", ".png"))
+		toc = time.time()
+		print("Processing frames done with " + str(toc - tic) + " seconds")
+		
+		#save the frames info in a pkl file
+		if(frames_info is not None):
+			print("Saving frames info of the stream to a pkl file...")
+			frames_info_name = source
+			frames_info_name = frames_info_name.split("/")[-1].replace(".mp4", "")
+			#frames_info_name = frames_info_name.split("/")[-1].replace(".webm", "") #cv2 is not really well with webm ?
+			frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
+			frames_info_name = frames_info_name.replace("-", "_").lower()
+			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
+			frames_info_name = db_path+"/"+frames_info_name
+			functions1.save_pkl(content = frames_info, exact_path = frames_info_name)
+			print("Done saving")
+		else:
+			print("no face was detected in this stream")
+	
+			
+	#kill open cv things
+	cap.release()
+	cv2.destroyAllWindows()
 	
 	functions1.save_pkl(content = embeddings, exact_path = pkl_path)
 
-	return None
+	print("Done with enhanced_stream")
+
+	pass
+
+def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30):
+	"""
+	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
+	source is the path to the mp4 file.
+	speed can be either "fast", "slow", or "normal".
+	fps is usually left to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
+	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
+	"""
+	functions1.print_license()
+	
+	f = open(frames_info_path, 'rb')
+	
+	frames_info = pickle.load(f)
+
+	if(speed == "fast"):
+		wait_key_time = int(np.round(1/fps * 1000 / 2))
+	elif(speed == "slow"):
+		wait_key_time = int(np.round(1/fps * 1000 * 2))
+	else:
+		wait_key_time = int(np.round(1/fps * 1000))
+
+	print("Playing the stream with annotations...\nPress q to abort")
+	frame_info_index = 0
+	frame_index = 0
+
+	cap = cv2.VideoCapture(source) #webcam or path to video file
+	
+	#if(frames_info is not None):
+	ret = True
+	while(not (cv2.waitKey(wait_key_time) & 0xFF == ord('q')) and ret == True):
+		ret, img = cap.read() 
+
+		if img is None:
+			break
+		
+		# Extracting frames info...
+		if(frame_info_index < len(frames_info) and frames_info[frame_info_index]["frame_index"] == frame_index):
+			#the frames_info item of index frame_info_index has some face(s) inside
+			for face_info in frames_info[frame_info_index]["detected_faces"]:
+				functions1.face_inform(face_info, img)
+
+			frame_info_index += 1
+		
+		frame_index += 1
+		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
+		cv2.imshow(window_name,img)
+
+	cap.release()
+	cv2.destroyAllWindows()
+	print("Done with play_with_annotations")
 
 def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 	"""

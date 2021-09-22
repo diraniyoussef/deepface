@@ -80,10 +80,22 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 			elif(x.change_type == 'D'):
 				to_be_removed_images_list.append(x.b_path)
 	#Although user might rename an image and it might be worthy to trace such thing, but it is not a direct process in git so postponed. A renamed file is deleted and made new when it comes to git and us.
+	
+	return to_be_added_images_list, to_be_removed_images_list
+
+
+def commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_index = [], db_path="."):
+	#User might add an image to his database, might rename, move, delete, etc...
+
+	#first remove from added_images_list the images in which no face was detected; we want to keep them untracked
+	images_undetected_faces_index.reverse() #this relies on the fact that images_undetected_faces_index was originally ascendingly sorted 
+	[to_be_added_images_list.pop(i) for i in images_undetected_faces_index]
+	
+	try:
+		repo = Repo(db_path) #this throws an error if it's not git-initialized already
+	except Exception:
+		repo = Repo.init(db_path, bare=False) #initializing
 		
-	#TODO it's better not to track images that won't be accepted as faces...
-
-
 	#Now staging images to make them ready for committing and to clear the staging area for future changes
 	commit = False
 	#below, removing is made on purpose before adding, for the sake of modified files which I made as belonging to both. Because a modified file must be committed as being added, not removed.
@@ -106,7 +118,8 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 	if(commit):
 		repo.index.commit("commit at " + time.ctime().replace(" ", "_"))
 	
-	return (to_be_added_images_list, to_be_removed_images_list)
+	pass
+
 
 def update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
 	#if(len(removed_images_list)!=0):
@@ -115,11 +128,15 @@ def update_embeddings(embeddings, removed_images_list, added_images_list, model,
 			if(embeddings[i][0] == removed_image):
 				embeddings.pop(i)
 				break # even if user has named 2 images in separate folders the same name, it still works since we deal with relative paths
+	
+	images_undetected_faces_index = []
+
 	if(len(added_images_list)!=0):#not needed but anyway.	
-		added_embeddings = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		added_embeddings, images_undetected_faces_index = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 		embeddings.extend(added_embeddings)
 		embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
-	return embeddings
+	return embeddings, images_undetected_faces_index
+
 
 def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png")):
 	#check git for possible user-made changes then commit
@@ -127,10 +144,16 @@ def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_p
 	print("Supposed updates in database after last save to", pkl_path, "are :")
 	print("added images list :", added_images_list)
 	print("removed images list :", removed_images_list)
+
+	images_undetected_faces_index = []
 	try:
-		embeddings = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		embeddings, images_undetected_faces_index = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 	except Exception as err:
 		print(err)
+		
+	#now committing
+	commit_changes(removed_images_list, added_images_list, images_undetected_faces_index, db_path = db_path)
+
 	return embeddings
 
 def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact"):
@@ -159,6 +182,7 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 	pbar = tqdm(range(0,len(employees)), position= 0)
 
 	embeddings = []
+	images_undetected_faces_index = []
 	#for employee in employees:
 	for index in pbar:
 		employee = employees[index] #it's a copy byval, not references
@@ -170,6 +194,7 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 		except Exception as err:
 			#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
 			print("Could not detect a face in this image :", employee)
+			images_undetected_faces_index.append(index)
 			continue
 
 		embedding.append(employee)
@@ -177,7 +202,7 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 		embeddings.append(embedding)
 	pbar.set_description("All embeddings tried.")
 	
-	return embeddings
+	return embeddings, images_undetected_faces_index
 
 def save_pkl(content = [], exact_path = "representations.pkl"):
 	print("Storing in ", exact_path, " file")
@@ -551,7 +576,7 @@ def print_license():
 	#license to thank Mr. Sefik Ilkin Serengil for his wonderful work which he made available on Github. It's mandatory to put the license, and I hope I can pay him back...
 	print("MIT License\n\nCopyright (c) 2019 Sefik Ilkin Serengil\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
 	print("\n\nEnd of license\n\n")
-	print("We note that further development has been made to cutomize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n\n")
+	print("Note that further development has been made to customize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n\n")
 	pass
 
 def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".png")):

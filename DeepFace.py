@@ -482,20 +482,22 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons. 
 	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
 	7) source can be an YouTube video. --TODO
-	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Even later we can use distribute processes on multiple computers. TODO
+	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Even later we can use distribute processes on multiple computers. --TODO
 	
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
 
 
 	#TODO
-	launch it from the terminal or the cmd prompt
+	launch it from the terminal or the cmd prompt --DONE
 
-	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.
+	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.--POSTPONED
 
-	know why some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from ?
+	Know why some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from ?
 
-	test how small an image can be in order to be recognized. And when a face is near the edge, it doesn't probably detect it, how to fix it ?
+	Test how small an image can be in order to be recognized. Small enough. --DONE
+	
+	When a face is near the edge, it doesn't probably detect it, how to fix it ?
 
 	test fidelity of the recognition in case a person is totally turning his head right or left
 
@@ -580,14 +582,24 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		
 		if len(employees) == 0:
 			#embeddings = [] #redundant
+			images_undetected_faces_index = []
 			auto_add = True
-			print("No images were found in the database, so images will be automatically added from video source.")
+			print("No images were found in the database") 
+			if(auto_add):
+				print("images will be automatically added from video source")
+			else:
+				print("make sure that auto_add is set to True. Aborting...")
+				return
 		else:
 			employees.sort()
-			embeddings = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization)
-
+			try:
+				embeddings, images_undetected_faces_index = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization)
+			except Exception as err:
+				print("caught exception when trying to find embeddings to images in db_path where no pkl file exists", err)
+				return 
 		#commit in git. No need to check for user-made changes since we have checked all images just now, so check_change's return values aren't interesting.
-		functions1.check_change(db_path = db_path, img_type = img_type)
+		to_be_added_images_list, to_be_removed_images_list = functions1.check_change(db_path = db_path, img_type = img_type)
+		functions1.commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_index, db_path = db_path)
 
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
 	df['distance_metric'] = distance_metric
@@ -658,19 +670,23 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	return frames_info_name
 
-def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30):
+def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, im_size = ()):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file.
 	speed can be either "fast", "slow", or "normal".
 	fps is usually left to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
+	im_size is e.g. (960, 540)
 	"""
 	functions1.print_license()
 	
-	f = open(frames_info_path, 'rb')
-	
-	frames_info = pickle.load(f)
+	try:
+		with open(frames_info_path, 'rb') as f:
+			frames_info = pickle.load(f)
+	except Exception as err:
+		if(err.args[0] == 2): print("Error while attempting to open file of path \"{}\". Make sure it exists.".format(frames_info_path))
+		return
 
 	if(speed == "fast"):
 		wait_key_time = int(np.round(1/fps * 1000 / 2))
@@ -703,6 +719,8 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 		
 		frame_index += 1
 		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
+		if(im_size != ()):
+			img = cv2.resize(img, im_size) 
 		cv2.imshow(window_name,img)
 
 	cap.release()

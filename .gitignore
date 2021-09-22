@@ -15,3 +15,4 @@ detectors/FaceDetector.py~
 detectors/OpenCvWrapper.py~
 .idea/deepface.iml
 .idea/.gitignore
+.vscode/launch.json

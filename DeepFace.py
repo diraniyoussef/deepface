@@ -468,12 +468,12 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 		return resp_obj
 
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', hard_detection_failure = False, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
 	1) The git functionality runs at the start and upon user request, according to a GUI button or maybe a listener to a text file change event, as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database. 
-	2) If hard_detection_failure is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
+	2) If skip_no_face_images is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
 	3) When process_only is True we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
 	This pkl file is useful to replay smoothly (play_with_annotations function) with some limited info like name and main emotion, as well to make statistics. E.g. we can trace a particular person when he appeared and when he disappeared. It's useful for recognition as well for emotion analysis, e.g. we can track when a particular person was happy with which persons, or e.g. what is the average of each emotion for a particular person or the average of emotions for all persons. Having e.g. 6 persons detected, there can be an analysis to each and every one of them [old: we would have a table where the colomns are the name of those people]
 	This pkl file is a list of dictionarie, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
@@ -485,10 +485,14 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Even later we can use distribute processes on multiple computers. TODO
 	
 
-	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', hard_detection_failure = True, source = '/home/youssef/videos/hi.mp4')
+	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
 
 
 	#TODO
+	launch it from the terminal or the cmd prompt
+
+	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.
+
 	know why some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from ?
 
 	test how small an image can be in order to be recognized. And when a face is near the edge, it doesn't probably detect it, how to fix it ?
@@ -502,15 +506,12 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	add the timing to each frame of frames_info in the pkl file
 
 	use auto_add to get a panoramic set of profile images of a particular person if that helps in recognition.
-
-	launch it from the terminal or the cmd prompt
-
-	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.
 	
 	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
 
 	"""
 	functions1.print_license()
+	print("Version 1.0")
 
 	#inform about the time
 	start_time = time.ctime()
@@ -569,7 +570,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			print(err)		
 		
 		#check git and update embeddings
-		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, img_type = img_type)
+		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type)
 
 		#Just about leaving the program we shall write changes to pickle file, since user or program may make changes to embeddings.
 
@@ -583,7 +584,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			print("No images were found in the database, so images will be automatically added from video source.")
 		else:
 			employees.sort()
-			embeddings = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+			embeddings = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization)
 
 		#commit in git. No need to check for user-made changes since we have checked all images just now, so check_change's return values aren't interesting.
 		functions1.check_change(db_path = db_path, img_type = img_type)
@@ -599,6 +600,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		print("Emotion model loaded")
 
 	cap = cv2.VideoCapture(source) #webcam or path to video file
+
+	frames_info_name = ""
 
 	if(not process_only):	
 		#here we think realtime		
@@ -653,7 +656,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	print("Done with enhanced_stream")
 
-	pass
+	return frames_info_name
 
 def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30):
 	"""
@@ -705,44 +708,6 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	cap.release()
 	cv2.destroyAllWindows()
 	print("Done with play_with_annotations")
-
-def play_with_annotations(source, frames_info_path, window_name = "img"):
-	"""
-	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
-	source is the path to 
-	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
-	"""
-	f = open(frames_info_path, 'rb')
-	frames_info = pickle.load(f)
-
-	print("Playing the stream with annotations...")
-	frame_info_index = 0
-	frame_index = 0
-
-	cap = cv2.VideoCapture(source) #webcam or path to video file
-	
-	#if(frames_info is not None):
-	ret = True
-	while(not (cv2.waitKey(30) & 0xFF == ord('q')) and ret == True):
-		ret, img = cap.read() 
-
-		if img is None:
-			break
-		
-		# Extracting frames info...
-		if(frame_info_index < len(frames_info) and frames_info[frame_info_index]["frame_index"] == frame_index):
-			#the frames_info item of index frame_info_index has some face(s) inside
-			for face_info in frames_info[frame_info_index]["detected_faces"]:
-				functions1.face_inform(face_info, img)
-
-			frame_info_index += 1
-		
-		frame_index += 1
-		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
-		cv2.imshow(window_name,img)
-
-	cap.release()
-	cv2.destroyAllWindows()
 
 def enhanced_find(img_path, db_path, auto_add = False, model_name ='VGG-Face', distance_metric = 'cosine', model = None, hard_detection_failure = True, detector_backend = 'opencv', align = True, prog_bar = True, normalization = 'base'):
 	"""

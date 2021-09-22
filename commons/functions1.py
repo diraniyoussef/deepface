@@ -179,7 +179,6 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 	
 	return embeddings
 
-
 def save_pkl(content = [], exact_path = "representations.pkl"):
 	print("Storing in ", exact_path, " file")
 	f = open(exact_path, "wb") #this makes a new file or completely overrides an existing one

@@ -8,6 +8,7 @@ import cv2
 
 from git import Repo
 import time
+import multiprocessing
 
 from tqdm import tqdm
 import pickle
@@ -121,7 +122,7 @@ def commit_changes(to_be_removed_images_list, to_be_added_images_list, images_un
 	pass
 
 
-def update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
+def update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
 	#if(len(removed_images_list)!=0):
 	for removed_image in removed_images_list: # processing removed images are made on purpose before added images, for the sake of modified files.
 		for i in range(len(embeddings)):					
@@ -132,13 +133,13 @@ def update_embeddings(embeddings, removed_images_list, added_images_list, model,
 	images_undetected_faces_index = []
 
 	if(len(added_images_list)!=0):#not needed but anyway.	
-		added_embeddings, images_undetected_faces_index = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		added_embeddings, images_undetected_faces_index = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 		embeddings.extend(added_embeddings)
 		embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
 	return embeddings, images_undetected_faces_index
 
 
-def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png")):
+def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png"), number_of_processes = 1):
 	#check git for possible user-made changes then commit
 	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
 	print("Supposed updates in database after last save to", pkl_path, "are :")
@@ -147,7 +148,7 @@ def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_p
 
 	images_undetected_faces_index = []
 	try:
-		embeddings, images_undetected_faces_index = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		embeddings, images_undetected_faces_index = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 	except Exception as err:
 		print(err)
 		
@@ -176,9 +177,10 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					break
 	return employees
 
-def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
-    #this is almost like the represent function in DeepFace module, but more fitting to the use case
-
+def get_embeddings_process(process_result, employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
+	#this is almost like the represent function in DeepFace module, but more fitting to the use case
+	print("starting process of id {}".format(os.getpid()))
+	
 	pbar = tqdm(range(0,len(employees)), position= 0)
 
 	embeddings = []
@@ -201,8 +203,42 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 		embedding.append(img_representation)
 		embeddings.append(embedding)
 	pbar.set_description("All embeddings tried.")
+
+	process_result = [{"embeddings":embeddings, "images_undetected_faces_index":images_undetected_faces_index}]
 	
-	return embeddings, images_undetected_faces_index
+	return 
+
+def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
+    #this task will be subdivided into as many processes desired by user
+	
+	#if(len(employees) == 0):
+	#	return [], []
+
+	if(int(number_of_processes) != number_of_processes or number_of_processes <= 0):
+		print("number_of_processes entered by the user is not suitable. Assuming 1 as number of processes...")
+		number_of_processes = 1
+
+	embeddings = []
+	images_undetected_faces_index = []
+
+	with multiprocessing.Manager() as manager:
+		process_result = [manager.list([])] * number_of_processes
+		
+		p = ["a process will be here"] * number_of_processes
+
+		employees_portion_amount = int(len(employees) / number_of_processes)
+
+		for i in range(number_of_processes):
+			employees_portion = employees[i*employees_portion_amount : min( len(employees), (i+1)*employees_portion_amount )]
+			p[i] = multiprocessing.Process(target=get_embeddings_process, args=(process_result[i], employees_portion, model, represent), kwargs={"db_path":db_path, "target_size":target_size, "hard_detection_failure":hard_detection_failure, "detector_backend":detector_backend, "normalization":normalization})
+			p[i].start()
+
+		for i in range(number_of_processes):
+			p[i].join()
+			embeddings.extend(process_result[i]["embeddings"])
+			images_undetected_faces_index.extend(process_result[i]["images_undetected_faces_index"])
+	
+	return
 
 def save_pkl(content = [], exact_path = "representations.pkl"):
 	print("Storing in ", exact_path, " file")

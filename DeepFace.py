@@ -482,7 +482,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons. 
 	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
 	7) source can be an YouTube video. --TODO
-	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Even later we can use distribute processes on multiple computers. --TODO
+	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Allowing pressing 1 to abort long running processes an terminate the program. --TODO Even later we can use distribute processes on multiple computers. --TODO
 	
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
@@ -572,7 +572,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			print(err)		
 		
 		#check git and update embeddings
-		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type)
+		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type, number_of_processes = number_of_processes)
 
 		#Just about leaving the program we shall write changes to pickle file, since user or program may make changes to embeddings.
 
@@ -593,7 +593,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		else:
 			employees.sort()
 			try:
-				embeddings, images_undetected_faces_index = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization)
+				embeddings, images_undetected_faces_index = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 			except Exception as err:
 				print("caught exception when trying to find embeddings to images in db_path where no pkl file exists", err)
 				return 

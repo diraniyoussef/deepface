@@ -8,7 +8,7 @@ import cv2
 
 from git import Repo
 import time
-import multiprocessing
+from multiprocessing import Pool
 
 from tqdm import tqdm
 import pickle
@@ -177,40 +177,35 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					break
 	return employees
 
-def get_embeddings_process(process_result, employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
-	#this is almost like the represent function in DeepFace module, but more fitting to the use case
+def get_embeddings_process(index):
+	"""
+	For technical reasons which have to do with pool in multiprocessing I had to put this function in the top level; it cannot be nested in get_embeddings function.
+	This will return a dictionary e.g. either
+	{"embedding": [employee, representation]}
+	or
+	{"image_undetected_faces_index":index}
+	"""
 	print("starting process of id {}".format(os.getpid()))
 	
-	pbar = tqdm(range(0,len(employees)), position= 0)
-
-	embeddings = []
-	images_undetected_faces_index = []
-	#for employee in employees:
-	for index in pbar:
-		employee = employees[index] #it's a copy byval, not references
-		pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
-		embedding = []
-		
-		try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
-			img_representation = represent(db_path +'/'+ employee, model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
-		except Exception as err:
-			#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
-			print("Could not detect a face in this image :", employee)
-			images_undetected_faces_index.append(index)
-			continue
-
-		embedding.append(employee)
-		embedding.append(img_representation)
-		embeddings.append(embedding)
-	pbar.set_description("All embeddings tried.")
-
-	process_result = [{"embeddings":embeddings, "images_undetected_faces_index":images_undetected_faces_index}]
+	#TODO need to find a way for the arguments to work
+	"""
+	employee = employees[index] #it's a copy byval, not references
+	#pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
 	
-	return 
+	try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
+		img_representation = represent(db_path +'/'+ employee, model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		return {"embedding":[employee, img_representation]}
+	except Exception as err:
+		#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
+		print("Could not detect a face in this image : {}".format(employee))
+		return {"image_undetected_faces_index":index}
+	"""
 
 def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
-    #this task will be subdivided into as many processes desired by user
-	
+	"""
+	This is almost like the represent function in DeepFace module, but more fitting to the use case.
+	This task will be subdivided into as many processes desired by user
+	"""
 	#if(len(employees) == 0):
 	#	return [], []
 
@@ -221,24 +216,23 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 	embeddings = []
 	images_undetected_faces_index = []
 
-	with multiprocessing.Manager() as manager:
-		process_result = [manager.list([])] * number_of_processes
+	print("starting process of id {}".format(os.getpid()))		
+
+	if number_of_processes == 1 :
 		
-		p = ["a process will be here"] * number_of_processes
+	else:
+		with Pool(number_of_processes) as pool:
+			employees_len = len(employees)
+			pbar = tqdm(pool.imap(get_embeddings_process, range(employees_len)), total=employees_len, desc="checking images in the database")
+			result_l = list(pbar)
+			for d in result_l:
+				embedding = d.get("embedding")
+				if(embedding is not None):
+					embeddings.append(embedding)
+				else: # now d.get("image_undetected_faces_index") is not None
+					images_undetected_faces_index.append(d.get("image_undetected_faces_index"))
 
-		employees_portion_amount = int(len(employees) / number_of_processes)
-
-		for i in range(number_of_processes):
-			employees_portion = employees[i*employees_portion_amount : min( len(employees), (i+1)*employees_portion_amount )]
-			p[i] = multiprocessing.Process(target=get_embeddings_process, args=(process_result[i], employees_portion, model, represent), kwargs={"db_path":db_path, "target_size":target_size, "hard_detection_failure":hard_detection_failure, "detector_backend":detector_backend, "normalization":normalization})
-			p[i].start()
-
-		for i in range(number_of_processes):
-			p[i].join()
-			embeddings.extend(process_result[i]["embeddings"])
-			images_undetected_faces_index.extend(process_result[i]["images_undetected_faces_index"])
-	
-	return
+	return embeddings, images_undetected_faces_index
 
 def save_pkl(content = [], exact_path = "representations.pkl"):
 	print("Storing in ", exact_path, " file")

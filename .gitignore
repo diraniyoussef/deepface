@@ -6,6 +6,7 @@ Readme~
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/inspectionProfiles/Project_Default.xml
+/__pycache__/
 commons/functions.py~
 commons/realtime.py~
 commons/__pycache__/functions.cpython-38.pyc
@@ -16,3 +17,4 @@ detectors/OpenCvWrapper.py~
 .idea/deepface.iml
 .idea/.gitignore
 .vscode/launch.json
+.idea/

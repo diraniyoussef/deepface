@@ -1,3 +1,5 @@
+from experiment import get_embeddings_process
+#from deepface.commons import experiment
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import re
@@ -178,29 +180,6 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					break
 	return employees
 
-def get_embeddings_process(employees, model, represent, index, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
-	"""
-	For technical reasons which have to do with pool in multiprocessing I had to put this function in the top level; it cannot be nested in get_embeddings function.
-	And also for technical reasons, index is the last parameter. This has to do with tqdm with pool.
-
-	This function will return a dictionary e.g. either
-	{"embedding": [employee, representation]}
-	or
-	{"image_undetected_faces_index":index}
-	"""
-	print("starting process of id {}".format(os.getpid()))
-	
-	
-	employee = employees[index] #it's a copy byval, not references
-	#pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
-	
-	try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
-		img_representation = represent(db_path +'/'+ employee, model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
-		return {"embedding":[employee, img_representation]}
-	except Exception as err:
-		#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
-		print("Could not detect a face in this image : {}".format(employee))
-		return {"image_undetected_faces_index":index}
 	
 
 def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
@@ -232,7 +211,8 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 	else:
 		with Pool(number_of_processes) as pool:
 			func = partial(get_embeddings_process, employees, model, represent, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
-			pbar = tqdm(pool.imap(func, range(employees_len)), total=employees_len, desc="checking images in the database")
+			p = pool.imap(func, range(employees_len))
+			pbar = tqdm(p, total=employees_len, desc="checking images in the database")
 			result_l = list(pbar)
 	
 	for d in result_l:

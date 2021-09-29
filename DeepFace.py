@@ -512,8 +512,10 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
 
 	"""
+
+
 	functions1.print_license()
-	print("Version 1.0")
+	print("Version 1.0\n\n")
 
 	#inform about the time
 	start_time = time.ctime()
@@ -595,7 +597,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			try:
 				embeddings, images_undetected_faces_index = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 			except Exception as err:
-				print("caught exception when trying to find embeddings to images in db_path where no pkl file exists", err)
+				print("caught exception when trying to find embeddings to images in db_path where no pkl file exists\n", err)
 				return 
 		#commit in git. No need to check for user-made changes since we have checked all images just now, so check_change's return values aren't interesting.
 		to_be_added_images_list, to_be_removed_images_list = functions1.check_change(db_path = db_path, img_type = img_type)

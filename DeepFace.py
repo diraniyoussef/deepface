@@ -468,7 +468,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 		return resp_obj
 
 global model # made global for technical reasons (it's pool)
-
+ 
 def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
@@ -523,10 +523,14 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	print(start_time)
 
 	#check passed db folder exists
-	if os.path.isdir(db_path) == False:
-		print("Provided database is not a directory i.e. folder.\nStopping execution.")
-		return None
-	
+	db_path = functions1.validate_win_path(db_path)
+	if os.path.isdir(path) == False:
+		print("Provided database is not a valid directory/folder.\nStopping execution.")
+		return None	
+	#------------------------
+
+	#get recognizable source
+	source = functions1.validate_win_path(source)
 	#------------------------
 
 	print("Detector backend is ", detector_backend, ". Building face detector model...")

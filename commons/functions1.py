@@ -56,6 +56,15 @@ def get_model_and_metric_names(model_name = 'VGG-Face', distance_metric = 'cosin
 	
 	return (model_names, metric_names)
 
+def validate_win_path(path):
+	if os.name == 'nt': #running on windows os
+		path = path.replace("\\","/")
+		path = repr(path)
+		path = path.replace("\\","/")
+		path = path.strip("'")
+	return path
+
+
 def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function can be called in its own thread
 	"""
 	The goal of this function check_change is to trace the files without having to read the whole database for any tiny change made by the user like adding an image or deleting another.
@@ -177,7 +186,7 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					employees.append(path)
 					break
 	return employees
-
+ 
 def get_embeddings_process(employees, represent, index, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
 	"""
 	For technical reasons which have to do with pool in multiprocessing I had to put this function in the top level; it cannot be nested in get_embeddings function.

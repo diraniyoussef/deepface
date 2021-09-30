@@ -467,7 +467,8 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
-global model
+global model # made global for technical reasons (it's pool)
+
 def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
@@ -487,7 +488,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
 
-
+ 
 	#TODO
 	launch it from the terminal or the cmd prompt --DONE
 

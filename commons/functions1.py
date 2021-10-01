@@ -95,12 +95,17 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 	return to_be_added_images_list, to_be_removed_images_list
 
 
-def commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_index = [], db_path="."):
+def commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_list = [], db_path="."):
 	#User might add an image to his database, might rename, move, delete, etc...
 
 	#first remove from added_images_list the images in which no face was detected; we want to keep them untracked
-	images_undetected_faces_index.reverse() #this relies on the fact that images_undetected_faces_index was originally ascendingly sorted 
-	[to_be_added_images_list.pop(i) for i in images_undetected_faces_index]
+	#images_undetected_faces_list.reverse() #this relies on the fact that images_undetected_faces_list was originally ascendingly sorted. We pop always starting from high indices.
+	#[to_be_added_images_list.pop(i) for i in images_undetected_faces_list] #this is fine with the order check_change then get_embeddings, the case where employees of get embeddings were not but to_be_added_images_list. But it doesn't work with the order get_embeddings then check_change.
+	for im_path_no_face in images_undetected_faces_list: #im_path a relative path
+		for i in range(len(to_be_added_images_list)):
+			if to_be_added_images_list[i] == im_path_no_face:
+				to_be_added_images_list.pop(i)
+				break
 	
 	try:
 		repo = Repo(db_path) #this throws an error if it's not git-initialized already
@@ -132,38 +137,38 @@ def commit_changes(to_be_removed_images_list, to_be_added_images_list, images_un
 	pass
 
 
-def update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
+def update_embeddings(embeddings, removed_images_list, added_images_list, model_name, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
 	#if(len(removed_images_list)!=0):
 	for removed_image in removed_images_list: # processing removed images are made on purpose before added images, for the sake of modified files.
-		for i in range(len(embeddings)):					
+		for i in range(len(embeddings)):
 			if(embeddings[i][0] == removed_image):
 				embeddings.pop(i)
 				break # even if user has named 2 images in separate folders the same name, it still works since we deal with relative paths
 	
-	images_undetected_faces_index = []
+	images_undetected_faces_list = []
 
 	if(len(added_images_list)!=0):#not needed but anyway.	
-		added_embeddings, images_undetected_faces_index = get_embeddings(added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
+		added_embeddings, images_undetected_faces_list = get_embeddings(added_images_list, model_name, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 		embeddings.extend(added_embeddings)
 		embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
-	return embeddings, images_undetected_faces_index
+	return embeddings, images_undetected_faces_list
 
 
-def check_git_and_update_embeddings(embeddings, model, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png"), number_of_processes = 1):
+def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png"), number_of_processes = 1):
 	#check git for possible user-made changes then commit
 	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
 	print("Supposed updates in database after last save to", pkl_path, "are :")
-	print("added images list :", added_images_list)
-	print("removed images list :", removed_images_list)
+	print("Added images list :", added_images_list)
+	print("Removed images list :", removed_images_list)
 
-	images_undetected_faces_index = []
+	images_undetected_faces_list = []
 	try:
-		embeddings, images_undetected_faces_index = update_embeddings(embeddings, removed_images_list, added_images_list, model, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
+		embeddings, images_undetected_faces_list = update_embeddings(embeddings, removed_images_list, added_images_list, model_name, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 	except Exception as err:
 		print(err)
 		
 	#now committing
-	commit_changes(removed_images_list, added_images_list, images_undetected_faces_index, db_path = db_path)
+	commit_changes(removed_images_list, added_images_list, images_undetected_faces_list, db_path = db_path)
 
 	return embeddings
 
@@ -187,15 +192,16 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 					break
 	return employees
  
-def get_embeddings_process(employees, represent, index, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
+def get_embeddings_process(employees, model_name, represent, index, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
 	"""
 	For technical reasons which have to do with pool in multiprocessing I had to put this function in the top level; it cannot be nested in get_embeddings function.
-	And also for technical reasons, index is the last parameter. This has to do with tqdm with pool.
+	And index is the last parameter. This has to do with tqdm with pool.
+	And model_name is passed instead of model because pool couldn't simply recognize DeepFace.model, so I had to read get the model every time
 
 	This function will return a dictionary e.g. either
 	{"embedding": [employee, representation]}
 	or
-	{"image_undetected_faces_index":index}
+	{"undetected_faces_image":index}
 	"""
 	print("starting process of id {}".format(os.getpid()))
 	
@@ -203,15 +209,15 @@ def get_embeddings_process(employees, represent, index, db_path = ".", target_si
 	#pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
 	
 	try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
-		img_representation = represent(db_path +'/'+ employee, DeepFace.model, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+		img_representation = represent(db_path +'/'+ employee, model = DeepFace.get_model(model_name), target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 		return {"embedding":[employee, img_representation]}
 	except Exception as err:
 		#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
 		print("Could not detect a face in this image : {}".format(employee))
-		return {"image_undetected_faces_index":index}
+		return {"undetected_faces_image":employee}
 
 
-def get_embeddings(employees, model, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
+def get_embeddings(employees, model_name, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
 	"""
 	This is almost like the represent function in DeepFace module, but more fitting to the use case.
 	This task will be subdivided into as many processes desired by user
@@ -224,10 +230,11 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 		number_of_processes = 1
 
 	embeddings = []
-	images_undetected_faces_index = []
+	images_undetected_faces_list = []
 
-	print("starting process of id {}".format(os.getpid()))
+	print("Main process of id {}".format(os.getpid()))
 
+	employees.sort()
 	employees_len = len(employees)
 
 	if number_of_processes == 1 :
@@ -235,11 +242,11 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 
 		result_l = []
 		for index in pbar:
-			result_l.append(get_embeddings_process(employees, represent, index, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization))
+			result_l.append(get_embeddings_process(employees, model_name, represent, index, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization))
 
 	else:
 		with Pool(number_of_processes) as pool:
-			func = partial(get_embeddings_process, employees, represent, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
+			func = partial(get_embeddings_process, employees, model_name, represent, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 			p = pool.imap(func, range(employees_len))
 			pbar = tqdm(p, total=employees_len, desc="checking images in the database")
 			result_l = list(pbar)
@@ -248,10 +255,10 @@ def get_embeddings(employees, model, represent, db_path = ".", target_size = (22
 		embedding = d.get("embedding")
 		if(embedding is not None):
 			embeddings.append(embedding)
-		else: # now d.get("image_undetected_faces_index") is not None
-			images_undetected_faces_index.append(d.get("image_undetected_faces_index"))
+		else: # now d.get("undetected_faces_image") is not None
+			images_undetected_faces_list.append(d.get("undetected_faces_image"))
 
-	return embeddings, images_undetected_faces_index
+	return embeddings, images_undetected_faces_list
 
 def save_pkl(content = [], exact_path = "representations.pkl"):
 	print("Storing in ", exact_path, " file")

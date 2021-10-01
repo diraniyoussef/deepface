@@ -467,8 +467,9 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 
 		return resp_obj
 
-global model # made global for technical reasons (it's pool)
- 
+def get_model(model_name): # needed for the pool
+	return build_model(model_name)
+
 def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
@@ -487,7 +488,9 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
-
+	model_name : "VGG-Face", "Facenet", "OpenFace", "DeepFace"
+	distance_metric : "cosine", "euclidean", "euclidean_l2"
+	detector_backend : "retinaface", "mtcnn", "opencv", "ssd" or "dlib"
  
 	#TODO
 	launch it from the terminal or the cmd prompt --DONE
@@ -512,6 +515,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	
 	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
 
+	The name of the frames_info_....pkl file has to contain the model and distance metric used.
 	"""
 
 
@@ -524,7 +528,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	#check passed db folder exists
 	db_path = functions1.validate_win_path(db_path)
-	if os.path.isdir(path) == False:
+
+	if os.path.isdir(db_path) == False:
 		print("Provided database is not a valid directory/folder.\nStopping execution.")
 		return None	
 	#------------------------
@@ -543,7 +548,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	threshold = dst.findThreshold(model_name, distance_metric)
 
 	print("Building", model_name, "model...")
-	global model
+	
 	model = build_model(model_name)
 	print(model_name," is built")
 
@@ -580,7 +585,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			print(err)		
 		
 		#check git and update embeddings
-		embeddings = functions1.check_git_and_update_embeddings(embeddings, model, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type, number_of_processes = number_of_processes)
+		embeddings = functions1.check_git_and_update_embeddings(embeddings, model_name, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type, number_of_processes = number_of_processes)
 
 		#Just about leaving the program we shall write changes to pickle file, since user or program may make changes to embeddings.
 
@@ -590,7 +595,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		
 		if len(employees) == 0:
 			#embeddings = [] #redundant
-			images_undetected_faces_index = []
+			images_undetected_faces_list = []
 			auto_add = True
 			print("No images were found in the database") 
 			if(auto_add):
@@ -599,15 +604,17 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 				print("make sure that auto_add is set to True. Aborting...")
 				return
 		else:
-			employees.sort()
 			try:
-				embeddings, images_undetected_faces_index = functions1.get_embeddings(employees, model, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
+				embeddings, images_undetected_faces_list = functions1.get_embeddings(employees, model_name, quick_represent, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 			except Exception as err:
 				print("caught exception when trying to find embeddings to images in db_path where no pkl file exists\n", err)
 				return 
-		#commit in git. No need to check for user-made changes since we have checked all images just now, so check_change's return values aren't interesting.
+		#checking for changes in git is always needed then we commit
 		to_be_added_images_list, to_be_removed_images_list = functions1.check_change(db_path = db_path, img_type = img_type)
-		functions1.commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_index, db_path = db_path)
+		functions1.commit_changes(to_be_removed_images_list, to_be_added_images_list, images_undetected_faces_list, db_path = db_path)
+
+	toc = time.time()
+	print("Processing images representations done with " + str(toc - tic) + " seconds")
 
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
 	df['distance_metric'] = distance_metric

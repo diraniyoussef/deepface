@@ -6,5 +6,5 @@
 
 if __name__ == "__main__":
 	from deepface import DeepFace
-	DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database2', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 2)
+	DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 3)
 

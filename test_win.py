@@ -6,5 +6,11 @@
 
 if __name__ == "__main__":
 	from deepface import DeepFace
-	DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 3)
+	try:
+		#db_path = input("Please input db_path") #'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database1'
+		DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database1', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 2)
+	except SyntaxError as err:
+		#if(type(err)==tuple):
+		print("that's it")
+		#print(err)
 

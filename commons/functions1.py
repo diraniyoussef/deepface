@@ -156,15 +156,15 @@ def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path,
 	#check git for possible user-made changes then commit
 	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
 	print("Supposed updates in database after last save to", pkl_path, "are :")
-	print("Added images list :", added_images_list)
-	print("Removed images list :", removed_images_list)
+	print("\tAdded images list :", added_images_list)
+	print("\tRemoved images list :", removed_images_list)
 
 	images_undetected_faces_list = []
 	try:
 		embeddings, images_undetected_faces_list = update_embeddings(embeddings, removed_images_list, added_images_list, model_name, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 	except Exception as err:
 		print(err)
-		
+	
 	#now committing
 	commit_changes(removed_images_list, added_images_list, images_undetected_faces_list, db_path = db_path)
 
@@ -178,16 +178,21 @@ def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact
 	employees = []
 	for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
 		if(r.split("/")[-1] == ".git"):
+			print("bypasing git file") #debugging TODO check it on windows
 			continue
 		for file in f:
 			for t in img_type:
 				if (file.lower().endswith(t)):
-					path = r + "/" + file # exact path
+					slash = "/"
+					if os.name == 'nt': #running on windows os					
+						slash = "\\"
+					path = r + slash + file # exact path
                     #exact_path = os.path.join(r, file)
 					if(path_type != "exact"): # relative path
-						path = path[len(db_path)+1:] # +1 for the '/' after db_path and before relative path
+						path = path[len(db_path) + 1:] # +1 for the '/' after db_path and before relative path
 					employees.append(path)
 					break
+	print("Total number of images is {}".format(len(employees)))
 	return employees
  
 def get_embeddings_process(employees, employees_index_list, model_name, represent, index, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base'):
@@ -201,7 +206,8 @@ def get_embeddings_process(employees, employees_index_list, model_name, represen
 	or
 	{"undetected_faces_image":index}
 	"""
-	print("process id : {}".format(os.getpid()))
+	process_id = os.getpid()
+	print("subprocess id : {}".format(process_id))
 	
 	embeddings = []
 	images_undetected_faces_list = []
@@ -212,7 +218,7 @@ def get_embeddings_process(employees, employees_index_list, model_name, represen
 
 		for i in pbar:
 			employee = employees[i + employees_index_list[index]] #it's a copy byval, not references
-			pbar.set_description("Finding embedding for %s" % (employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
+			pbar.set_description("Process {} : Finding embedding for {}".format(process_id, employee.split("/")[-1])) #according to usage employee can be a full exact path or just a path after (without) the db_path. Both cases, .split("/")[-1] works fine. employee may even not contain '/' and it works fine.
 			
 			try: #this try-except is useful in case hard_detection_failure was set to True and not face was detected
 				img_representation = represent(db_path +'/'+ employee, model = DeepFace.get_model(model_name), target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
@@ -221,7 +227,7 @@ def get_embeddings_process(employees, employees_index_list, model_name, represen
 
 			except Exception as err:
 				#print(err) #usual message is as follows : Face could not be detected. Please confirm that the picture is a face photo or consider to set hard_detection_failure param to False.
-				print("Could not detect a face in this image : {}".format(employee))
+				#print("Could not detect a face in this image : {}".format(employee))
 				images_undetected_faces_list.append(employee)
 
 	return [embeddings, images_undetected_faces_list] #return value is made a list because of pool
@@ -284,6 +290,16 @@ def get_embeddings(employees, model_name, represent, db_path = ".", target_size 
 	for d in result_l:
 		embeddings.extend(d[0])
 		images_undetected_faces_list.extend(d[1])
+
+	#print images with no detected face
+	images_undetected_faces_list_len = len(images_undetected_faces_list)
+	if images_undetected_faces_list_len > 0:
+		if images_undetected_faces_list_len == 1:
+			print("could not detect a face for {}".format(images_undetected_faces_list[0]))
+		elif images_undetected_faces_list_len > 1:
+			print("could not detect a face for the following images :")
+			for img_path in images_undetected_faces_list:
+				print(img_path)
 
 	return embeddings, images_undetected_faces_list
 

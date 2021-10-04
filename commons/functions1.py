@@ -149,11 +149,15 @@ def update_embeddings(embeddings, removed_images_list, added_images_list, model_
 	if(len(added_images_list)!=0):#not needed but anyway.	
 		added_embeddings, images_undetected_faces_list = get_embeddings(added_images_list, model_name, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 		embeddings.extend(added_embeddings)
-		embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column
+		#embeddings.sort() #list sort is smart; it sorts first according to first column (which we care only about) then according to second column, but in practice it's not working and saying "The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()" but it's not a big deal anyway I guess.
 	return embeddings, images_undetected_faces_list
 
 
 def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), number_of_processes = 1):
+	"""
+	This is the case where the representations pkl file still exists. But implicitly, the .git folder also should exist.
+	Weird result happens when the .git folder is deleted (added images will be all the images again, and the embeddings will be doubled each which is reflected on the df data frame as well as the newly to be saved pkl representations file.)
+	"""
 	#check git for possible user-made changes then commit
 	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
 	print("Supposed updates in database after last save to", pkl_path, "are :")
@@ -164,7 +168,7 @@ def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path,
 	try:
 		embeddings, images_undetected_faces_list = update_embeddings(embeddings, removed_images_list, added_images_list, model_name, represent, db_path = db_path, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization, number_of_processes = number_of_processes)
 	except Exception as err:
-		print(err)
+		print("check_git_and_update_embeddings", err)
 	
 	#now committing
 	commit_changes(removed_images_list, added_images_list, images_undetected_faces_list, db_path = db_path)
@@ -180,7 +184,7 @@ def get_employees(db_path = ".", img_type = (".jpg", ".jpeg", ".bmp", ".png"), p
 	for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
 		r = validate_win_path(r)
 		if(r.split("/")[-1] == ".git"):
-			print("bypassing git file") #debugging TODO check it on windows
+			print("bypassing git file") #debugging TODO on windows it's fine. On Ubuntu ?
 			continue
 		for file in f:
 			for t in img_type:
@@ -267,6 +271,8 @@ def minimize_number_of_processes(employees_len, number_of_processes):
 def get_embeddings(employees, model_name, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
 	"""
 	This is almost like the represent function in DeepFace module, but more fitting to the use case.
+	The return value is enough to tell the story.
+
 	This task will be subdivided into as many processes desired by user
 	"""
 	#if(len(employees) == 0):
@@ -680,16 +686,13 @@ def get_emotions(face, emotion_model, detector_backend = 'opencv'):
 		mood_items.append(mood_item)
 
 	return mood_items
-	
-def print_meta():
-	print_license()
-	print("Version 1.0\n\n\n")
+
 
 def print_license():
 	#license to thank Mr. Sefik Ilkin Serengil for his wonderful work which he made available on Github. It's mandatory to put the license, and I hope I can pay him back...
 	print("MIT License\n\nCopyright (c) 2019 Sefik Ilkin Serengil\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
 	print("\n\nEnd of license\n\n")
-	print("Note that further development has been made to customize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n\n")
+	print("Note that further development has been made to customize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n")
 	pass
 
 def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".jpeg", ".bmp", ".png")):

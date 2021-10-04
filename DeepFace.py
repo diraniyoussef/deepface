@@ -517,11 +517,16 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
 
 	The name of the frames_info_....pkl file has to contain the model and distance metric used.
+
+	Do the ensemble model if it provides better accurracy.
+
+	I guess Arabic names don't work ?
 	"""
 
 
-	functions1.print_meta()
-	
+	functions1.print_license()
+	print("Version 1.0\n\n\n")
+
 	#inform about the time
 	start_time = time.ctime()
 	print(start_time)
@@ -546,6 +551,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	print("Finding distance threshold...")
 	#tuned thresholds for model and metric pair
 	threshold = dst.findThreshold(model_name, distance_metric)
+	print("threshold with distance_metric", distance_metric, "is", threshold) #TODO debugging
 
 	print("Building", model_name, "model...")
 	
@@ -580,7 +586,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		try:
 			with open(db_path+'/'+file_name, 'rb') as f:
 				embeddings = pickle.load(f)
-				print("There are ", len(embeddings)," embeddings found in ",file_name)
+				print("There are ", len(embeddings)," embeddings found in ", file_name)
 		except Exception as err:
 			print(err)
 		
@@ -693,8 +699,14 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	fps is usually left to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
 	im_size is e.g. (960, 540)
+
+	
+	TODO
+	Needs to play the sound as well.
+
 	"""
 	functions1.print_license()
+	print("Version 1.0\n\n\n")
 	
 	try:
 		with open(frames_info_path, 'rb') as f:

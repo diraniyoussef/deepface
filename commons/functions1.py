@@ -59,13 +59,13 @@ def get_model_and_metric_names(model_name = 'VGG-Face', distance_metric = 'cosin
 def validate_win_path(path):
 	if os.name == 'nt': #running on windows os
 		path = path.replace("\\","/")
-		path = repr(path)
-		path = path.replace("\\","/")
-		path = path.strip("'")
+		#path = repr(path) #it probably makes trouble with e.g. \a \b \1 etc...
+		#path = path.replace("\\","/")
+		#path = path.strip("'")
 	return path
 
 
-def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function can be called in its own thread
+def check_change(db_path=".", img_type = (".jpeg", ".jpg", ".png", ".bmp")): #this whole function can be called in its own thread
 	"""
 	The goal of this function check_change is to trace the files without having to read the whole database for any tiny change made by the user like adding an image or deleting another.
 	"""
@@ -75,21 +75,22 @@ def check_change(db_path=".", img_type = (".jpg", ".png")): #this whole function
 	except Exception:
 		repo = Repo.init(db_path, bare=False) #initializing
 	
-	#img_type = (".jpeg", ".jpg", ".png", ".bmp")
 	#check for untracked files
 	to_be_added_images_list = []
 	for f in repo.untracked_files: 
 		if(f.lower().endswith(img_type)):
+			f = validate_win_path(f)
 			to_be_added_images_list.append(f) #images aren't tracked yet
 	#check for unstaged files (which are already tracked)
 	to_be_removed_images_list = []
 	for x in repo.index.diff(None):
 		if(x.b_path.endswith(img_type)):#added in case someone messes with the repo, like adds something which isn't an image to the git staging area i.e. tracking it.
+			f = validate_win_path(x.b_path)
 			if(x.change_type == 'M'): #not sure how an image file could be modified, anyway
-				to_be_added_images_list.append(x.b_path)
-				to_be_removed_images_list.append(x.b_path) #this is in case 2 committed files interchanged their names together, so in a best effort manner they must both be removed, then they both must added
+				to_be_added_images_list.append(f)
+				to_be_removed_images_list.append(f) #this is in case 2 committed files interchanged their names together, so in a best effort manner they must both be removed, then they both must added
 			elif(x.change_type == 'D'):
-				to_be_removed_images_list.append(x.b_path)
+				to_be_removed_images_list.append(f)
 	#Although user might rename an image and it might be worthy to trace such thing, but it is not a direct process in git so postponed. A renamed file is deleted and made new when it comes to git and us.
 	
 	return to_be_added_images_list, to_be_removed_images_list
@@ -152,7 +153,7 @@ def update_embeddings(embeddings, removed_images_list, added_images_list, model_
 	return embeddings, images_undetected_faces_list
 
 
-def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".png"), number_of_processes = 1):
+def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), number_of_processes = 1):
 	#check git for possible user-made changes then commit
 	added_images_list, removed_images_list = check_change(db_path = db_path, img_type = img_type)
 	print("Supposed updates in database after last save to", pkl_path, "are :")
@@ -170,23 +171,21 @@ def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path,
 
 	return embeddings
 
-def get_employees(db_path = ".", img_type = (".jpg", ".png"), path_type = "exact"):
+def get_employees(db_path = ".", img_type = (".jpg", ".jpeg", ".bmp", ".png"), path_type = "exact"):
 	"""
     if path_type is "relative" the function returns list of relative paths of images i.e. path starting from the db_path excluding it. (any other keyword than "exact" will be considered as "relative")
     elif path_type is "exact" the function returns list of exact paths i.e. path starting from the db_path including.
 	"""
 	employees = []
 	for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
+		r = validate_win_path(r)
 		if(r.split("/")[-1] == ".git"):
-			print("bypasing git file") #debugging TODO check it on windows
+			print("bypassing git file") #debugging TODO check it on windows
 			continue
 		for file in f:
 			for t in img_type:
 				if (file.lower().endswith(t)):
-					slash = "/"
-					if os.name == 'nt': #running on windows os					
-						slash = "\\"
-					path = r + slash + file # exact path
+					path = r + "/" + file # exact path
                     #exact_path = os.path.join(r, file)
 					if(path_type != "exact"): # relative path
 						path = path[len(db_path) + 1:] # +1 for the '/' after db_path and before relative path
@@ -256,6 +255,15 @@ def get_share(employees_len, number_of_processes):
 		share_list_.append(n)
 	return share_list_
 
+def minimize_number_of_processes(employees_len, number_of_processes):
+	"""
+	Assuming that each process should at least hold 150 employees, if the number_of_processes was high then it must be lowered as such. We're not interested now in increasing the number of processes if it deserves to be higher, because this might be intended by the user, e.g. his hardware.
+	"""
+	while employees_len / number_of_processes < 150 and number_of_processes > 1:
+		number_of_processes -= 1
+
+	return number_of_processes
+
 def get_embeddings(employees, model_name, represent, db_path = ".", target_size = (224, 224), hard_detection_failure = False, detector_backend = 'opencv', normalization = 'base', number_of_processes = 1):
 	"""
 	This is almost like the represent function in DeepFace module, but more fitting to the use case.
@@ -276,13 +284,15 @@ def get_embeddings(employees, model_name, represent, db_path = ".", target_size 
 	employees.sort()
 	employees_len = len(employees)
 
+	number_of_processes = minimize_number_of_processes(employees_len, number_of_processes)
+
 	if number_of_processes == 1 :
 		first_employee_index = 0
 		result_l = get_embeddings_process(employees, [first_employee_index, employees_len], model_name, represent, first_employee_index, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 		result_l = [result_l]
 	else:
 		share_list = get_share(employees_len, number_of_processes)
-		with Pool(number_of_processes) as pool:
+		with Pool(number_of_processes) as pool: #if it were not that Pool() without specifying number_of_processes as argument is not working fine, I would had been interested in using it as so
 			func = partial(get_embeddings_process, employees, share_list, model_name, represent, db_path = db_path, target_size = target_size, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, normalization = normalization)
 			p = pool.map(func, range(len(share_list)))
 			result_l = list(p)
@@ -309,7 +319,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, emotion_model = None, normalization = "base", img_type = (".jpg", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -359,7 +369,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, emotion_model = None, normalization = 'base', img_type = (".jpg", ".png")):
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	face_detected = False
 	
 	resolution = img.shape 
@@ -387,7 +397,7 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 			frame_info["detected_faces"] = detected_faces
 			return frame_info
 
-def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".png"), auto_add = False):
+def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False):
 	"""
 	This will return everything related to the detected face.
 	'face' parameter is a numpy array of a cropped face
@@ -453,7 +463,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 
 	return face_info
 
-def get_most_similar_candidate(df, face_representation, threshold, img_type = (".jpg", ".png")):
+def get_most_similar_candidate(df, face_representation, threshold, img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	Our convention is to return an empty name string in case no close person to our target face was detected in the database 
 	"""
@@ -671,6 +681,10 @@ def get_emotions(face, emotion_model, detector_backend = 'opencv'):
 
 	return mood_items
 	
+def print_meta():
+	print_license()
+	print("Version 1.0\n\n\n")
+
 def print_license():
 	#license to thank Mr. Sefik Ilkin Serengil for his wonderful work which he made available on Github. It's mandatory to put the license, and I hope I can pay him back...
 	print("MIT License\n\nCopyright (c) 2019 Sefik Ilkin Serengil\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
@@ -678,7 +692,7 @@ def print_license():
 	print("Note that further development has been made to customize the code to work in the way we desired. Contact the developer @diraniyoussef on Telegram to ask for something.\n\n\n")
 	pass
 
-def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".png")):
+def create_representation_file(file_name, model_names, models, represent, db_path = ".", model_name = 'VGG-Face', hard_detection_failure = True, detector_backend = 'opencv', align = True, normalization = 'base', prog_bar = True, img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	employees = get_employees(db_path, img_type, path_type = "exact")
 

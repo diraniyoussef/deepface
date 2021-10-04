@@ -485,6 +485,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
 	7) source can be an YouTube video. --TODO
 	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Allowing pressing 1 to abort long running processes an terminate the program. --TODO Even later we can use distribute processes on multiple computers. --TODO
+	9) make an expiration license for the software so that it can be distributable to the user. --TODO
 	
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
@@ -519,9 +520,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	"""
 
 
-	functions1.print_license()
-	print("Version 1.0\n\n")
-
+	functions1.print_meta()
+	
 	#inform about the time
 	start_time = time.ctime()
 	print(start_time)
@@ -598,7 +598,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			images_undetected_faces_list = []
 			auto_add = True
 			print("No images were found in the database") 
-			if(auto_add):
+			if auto_add:
 				print("images will be automatically added from video source")
 			else:
 				print("make sure that auto_add is set to True. Aborting...")

@@ -478,7 +478,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	2) If skip_no_face_images is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
 	3) When process_only is True we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
 	This pkl file is useful to replay smoothly (play_with_annotations function) with some limited info like name and main emotion, as well to make statistics. E.g. we can trace a particular person when he appeared and when he disappeared. It's useful for recognition as well for emotion analysis, e.g. we can track when a particular person was happy with which persons, or e.g. what is the average of each emotion for a particular person or the average of emotions for all persons. Having e.g. 6 persons detected, there can be an analysis to each and every one of them [old: we would have a table where the colomns are the name of those people]
-	This pkl file is a list of dictionarie, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
+	This pkl file is a list of dictionaries, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
 	N.B: Some statistics cannot be exaggerated with their result, since we only get (for now at least) from 1 camera and it won't show a target person all the time, besides, this emotion recognition lacks continuity, e.g. I suspect that it will detect happiness while the person is actually feeling bad, but still it holds some valuable info, like e.g. how long can a person maintain an "apparent" feeling.
 	4) If actions = [] then this function only applies face recognition to a stream. We check each and every frame for recognition only. If actions = ['emotion'] then preferrably be it an offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. Anyway we have the option, probably in another function, of being recorded so that at replay time one can check the emotions continuously. 
 	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons. 
@@ -560,7 +560,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	text_color = (255,255,255)
 
 	employees = []
-	img_type = (".jpg", ".png")
+	img_type = (".jpg", ".jpeg", ".bmp", ".png")
 
 	#find embeddings for employee list
 
@@ -582,7 +582,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 				embeddings = pickle.load(f)
 				print("There are ", len(embeddings)," embeddings found in ",file_name)
 		except Exception as err:
-			print(err)		
+			print(err)
 		
 		#check git and update embeddings
 		embeddings = functions1.check_git_and_update_embeddings(embeddings, model_name, quick_represent, pkl_path, db_path = db_path, target_size = (input_shape_y, input_shape_x), hard_detection_failure = skip_no_face_images, detector_backend = detector_backend, normalization = normalization, img_type = img_type, number_of_processes = number_of_processes)
@@ -650,17 +650,17 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={"detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "emotion_model": emotion_model, "normalization": normalization, "img_type": (".jpg", ".png")}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={"detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
 			cv2.imshow('img',img)
 		
 	else: #process_only
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = (".jpg", ".png"))
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		
 		#save the frames info in a pkl file
-		if(frames_info is not None):
+		if frames_info is not None:
 			print("Saving frames info of the stream to a pkl file...")
 			frames_info_name = source
 			frames_info_name = frames_info_name.split("/")[-1].replace(".mp4", "")

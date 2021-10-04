@@ -6,5 +6,6 @@
 
 if __name__ == "__main__":
 	from deepface import DeepFace
-	DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 3)
+	#we won't care much for the slash or back-slash in the paths (especially the \U), since they'll be given by the user as string inputs, so they'll be probably well encoded
+	DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database1', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/6seconds.mp4', model_name = "DeepFace", actions = [], number_of_processes = 2)
 

@@ -703,7 +703,8 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	
 	TODO
 	Needs to play the sound as well.
-
+	show time of the video
+	allow a pause, rewind and forward buttons
 	"""
 	functions1.print_license()
 	print("Version 1.0\n\n\n")

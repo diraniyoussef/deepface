@@ -210,7 +210,7 @@ def get_embeddings_process(employees, employees_index_list, model_name, represen
 	{"undetected_faces_image":index}
 	"""
 	process_id = os.getpid()
-	print("subprocess id : {}".format(process_id))
+	print("\nProcess id : {}".format(process_id))
 	
 	embeddings = []
 	images_undetected_faces_list = []

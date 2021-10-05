@@ -212,7 +212,7 @@ def get_embeddings_process(employees, employees_index_list, model_name, represen
 	{"undetected_faces_image":index}
 	"""
 	process_id = os.getpid()
-	print("\nProcess id : {}".format(process_id))
+	print("\nWorker process id : {}".format(process_id))
 	
 	embeddings = []
 	images_undetected_faces_list = []
@@ -466,16 +466,21 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			"relative_path": employee_relative_path,
 			"distance": best_distance
 		}
-		if(best_distance <= threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to name it as he wishes.
-			if not os.path.isdir("auto_add"):
-				os.mkdir("auto_add")
+		if(best_distance > threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to name it as he wishes.
+			if not os.path.isdir(db_path + "/auto_add"):
+				os.mkdir(db_path + "/auto_add")
 
 			i = 0
-			name = "0.jpg" #it's on purpose that the name is a number. It's a perfect convention, so that in case the user has forgotten to rename it after being saved, it won't hold any name.
-			while os.path.isfile('auto_add/' + name):
+			name = str(i) + img_type[0] #it's on purpose that the name is a number. It's a perfect convention, so that in case the user has forgotten to rename it after being saved, it won't hold any name.
+			#first name is simply "0.jpg"
+			while os.path.isfile(db_path + "/auto_add/" + name):
 				i += 1
-				name = str(i) + ".jpg"
-			imageio.imwrite(name, face[0,:])
+				name = str(i) + img_type[0]
+			
+			face = face * 255
+			face = np.array(face, dtype="uint8")
+			print("\nauto adding unknown face...")
+			imageio.imwrite(db_path + "/auto_add/" + name, face[0,:])
 
 	return face_info
 

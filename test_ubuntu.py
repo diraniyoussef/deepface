@@ -9,5 +9,5 @@ if __name__ == "__main__":
 	from deepface import DeepFace
 
 	instructions.instructions()
-	DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/6seconds.mp4', actions = [], number_of_processes = 2)
+	DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/6seconds.mp4', actions = [], number_of_processes = 2, auto_add = True)
 	#DeepFace.play_with_annotations("C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/trial2.mp4", "C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database/frames_info_trial2.pkl", speed = "slow", fps = 30, im_size = (960, 540))

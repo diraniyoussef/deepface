@@ -470,7 +470,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 def get_model(model_name): # needed for the pool
 	return build_model(model_name)
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = 0, process_only = True, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
@@ -521,6 +521,12 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	Do the ensemble model if it provides better accurracy.
 
 	I guess Arabic names don't work ?
+
+	It would be interesting that in the process of finding representations of the images in the database to select a rectangle around the image. This way the user can make sure that the correct face is truly selected. On another hand, user should not be bothered with this; it's the R&D business.
+	
+	Since it's probably a good idea to expand the database of images, if the app recognized a face in frames e.g. 126 and 128, and only detected (not recognized) a face in frame 127 in the same box placement, then we may add the image and assign it the name of the recognized person.
+
+	One good feature is to allow the user while replaying to tag a face and add it to the database, and perhaps change the tag of a face. But auto-add somehow plays the same role when supervised by the supervisor (user).
 	"""
 
 
@@ -656,12 +662,12 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={"detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={"detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
 			cv2.imshow('img',img)
 		
 	else: #process_only
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		

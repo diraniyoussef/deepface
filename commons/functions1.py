@@ -2,6 +2,8 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import re
 
+import imageio
+
 import numpy as np
 import pandas as pd
 import cv2
@@ -325,7 +327,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -364,7 +366,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 		
 		pbar.set_description("Processing frame %s " % frame_index)
 		
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		if(frame_info is not None):
 			frames_info.append(frame_info)
 		
@@ -375,7 +377,8 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+
 	face_detected = False
 	
 	resolution = img.shape 
@@ -387,7 +390,7 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 	for face, (x, y, w, h) in faces:
 		#if w > 130: #discard small detected faces				
 
-		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add)
+		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add, db_path = db_path)
 
 		if(not process_only): #show the rectangles and texts without returning them.
 			if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
@@ -403,7 +406,7 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 			frame_info["detected_faces"] = detected_faces
 			return frame_info
 
-def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False):
+def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False, db_path = "."):
 	"""
 	This will return everything related to the detected face.
 	'face' parameter is a numpy array of a cropped face
@@ -463,9 +466,16 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			"relative_path": employee_relative_path,
 			"distance": best_distance
 		}
-		if(employee_name == "" and auto_add): #save face to database and add it to embeddings
-			#TODO			
-			pass
+		if(best_distance <= threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to name it as he wishes.
+			if not os.path.isdir("auto_add"):
+				os.mkdir("auto_add")
+
+			i = 0
+			name = "0.jpg" #it's on purpose that the name is a number. It's a perfect convention, so that in case the user has forgotten to rename it after being saved, it won't hold any name.
+			while os.path.isfile('auto_add/' + name):
+				i += 1
+				name = str(i) + ".jpg"
+			imageio.imwrite(name, face[0,:])
 
 	return face_info
 

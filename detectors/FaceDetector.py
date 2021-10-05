@@ -45,7 +45,7 @@ def detect_face(face_detector, detector_backend, img, align = True):
     return face, region
 
 def detect_faces(face_detector, detector_backend, img, align = True):
-
+ 
     backends = {
         'opencv': OpenCvWrapper.detect_face,
         'ssd': SsdWrapper.detect_face,
@@ -57,7 +57,7 @@ def detect_faces(face_detector, detector_backend, img, align = True):
     detect_face = backends.get(detector_backend)
 
     if detect_face:
-        obj = detect_face(face_detector, img, align) #Youssef - this detect_face(...) is actually something like OpenCvWrapper.detect_face(...)
+        obj = detect_face(face_detector, img, align) #Youssef - this detect_face(...) is actually something like OpenCvWrapper.detect_face(...). It is not the function above detect_faces.
         #obj stores list of detected_face and region pair
 
         return obj

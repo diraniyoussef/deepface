@@ -449,8 +449,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 
 	#-------------------------------
 	#face recognition
-
-	face = functions.preprocess_face(img = face, target_size = (target_size[0], target_size[1]), hard_detection_failure = False, detector_backend = detector_backend)
+	face = functions.preprocess_face(img = face, target_size = (target_size[0], target_size[1]), hard_detection_failure = False, detector_backend = detector_backend) #preprocess_face was used in DeepFace.quick_represent and by default it chooses 1 face among many in the img passed as argument, but here it takes already a cropped face as img and it's fine.
 	
 	#custom normalization. It wasn't originally part of analysis function in realtime.py
 	face = functions.normalize_input(img = face, normalization = normalization)
@@ -466,7 +465,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			"relative_path": employee_relative_path,
 			"distance": best_distance
 		}
-		if(best_distance > threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to name it as he wishes.
+		if(best_distance > threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to rename the new .jpg file as he wishes, then he runs the app again then they'll be added to embeddings 
 			if not os.path.isdir(db_path + "/auto_add"):
 				os.mkdir(db_path + "/auto_add")
 
@@ -476,9 +475,9 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			while os.path.isfile(db_path + "/auto_add/" + name):
 				i += 1
 				name = str(i) + img_type[0]
-			
-			face = face * 255
-			face = np.array(face, dtype="uint8")
+			if normalization == "base":
+				face = face * 255 #this is needed for the following line where the face array is converted from float32 to uint8
+			face = np.array(face, dtype="uint8") #this is needed for the following line where without it imwrite throws a warning, but not an exception
 			print("\nauto adding unknown face...")
 			imageio.imwrite(db_path + "/auto_add/" + name, face[0,:])
 

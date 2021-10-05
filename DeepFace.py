@@ -492,6 +492,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	model_name : "VGG-Face", "Facenet", "OpenFace", "DeepFace"
 	distance_metric : "cosine", "euclidean", "euclidean_l2"
 	detector_backend : "retinaface", "mtcnn", "opencv", "ssd" or "dlib"
+	normalization : "base", "raw", "Facenet", "Facenet2018", "VGGFace", "VGGFace2", "ArcFace" (it's there in functions.normalize_input)
  
 	#TODO
 	launch it from the terminal or the cmd prompt --DONE

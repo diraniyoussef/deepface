@@ -1,8 +1,8 @@
 import cv2, time
 
-path = r"C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/trial1.mp4"
-frame_number = 86
-(x,y,w,h) = (148, 440, 54, 54)
+path = r"C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/me.mp4"
+frame_number = 21
+(x,y,w,h) = (183, 294, 63, 63)
 
 cap = cv2.VideoCapture(path)
 

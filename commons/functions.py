@@ -160,26 +160,42 @@ def normalize_input(img, normalization = 'base'):
 
 	return img
 
-def preprocess_face(img, target_size=(224, 224), grayscale = False, hard_detection_failure = True, detector_backend = 'opencv', return_region = False, align = True):
+def preprocess_already_detected_face(img, region, target_size=(224, 224), grayscale = False, hard_detection_failure = True, return_region = False):
 
 	#img might be path, base64 or numpy array. Convert it to numpy whatever it is.
 	img = load_image(img)
-	base_img = img.copy()
+	
+	#img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, hard_detection_failure = hard_detection_failure, align = align)
+
+	continue_preprocess_face(img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
+
+def preprocess_face(img, target_size=(224, 224), grayscale = False, hard_detection_failure = True, detector_backend = 'opencv', return_region = False, align = True):
+
+	#img might be path, base64 or numpy array. Convert it to numpy whatever it is.
+	
+	img = load_image(img)
+	#base_img = img.copy()
 
 	img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, hard_detection_failure = hard_detection_failure, align = align)
+	
+	continue_preprocess_face(img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
+	
+def continue_preprocess_face(img, region, target_size=(224, 224), grayscale = False, hard_detection_failure = True, return_region = False):
+	
+	base_img = img.copy()
 
 	if img.shape[0] == 0 or img.shape[1] == 0:
 		if hard_detection_failure == True:
 			raise ValueError("Detected face shape is ", img.shape,". Consider to set hard_detection_failure argument to False.")
-		else: #restore base image
+		else: #restore base image. This case is wrong ! it will throw an exception error below (dividing by 0)
 			img = base_img.copy()
-
+	
 	#--------------------------
 
 	#post-processing
 	if grayscale == True:
 		img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
+	
 	#---------------------------------------------------
 	#resize image to expected shape
 
@@ -219,6 +235,7 @@ def preprocess_face(img, target_size=(224, 224), grayscale = False, hard_detecti
 		return img_pixels, region
 	else:
 		return img_pixels
+
 
 def find_input_shape(model):
 

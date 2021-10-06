@@ -3,6 +3,7 @@ from functools import partial
 import os
 import time
 
+
 def square(n):
     print("Worker process id for {0}: {1}\n".format(n, os.getpid()))
     return (n*n)
@@ -17,15 +18,15 @@ def _foo(a, b, c, d = "dd"):
     return [a + c, c]  
 
 if __name__ == "__main__":
-	multiprocessing.freeze_support() #for windows machine
-	mylist = [1,2,3,4,5]
-	with multiprocessing.Pool(2) as pool:
-		func = partial(_foo, 66, 88)
+    multiprocessing.freeze_support() #for windows machine
+    mylist = [1,2,3,4,5]
+    with multiprocessing.Pool(2) as pool:
+        func = partial(_foo, 66, 88)
 		#p1 = pool.imap(func, range(10))
 	
-		result = pool.map(func, mylist)
+        result = pool.map(func, mylist)
 	
-		print(result[0])
+        print(result[0])
 
 from deepface.commons import functions
 img = functions.preprocess_face(img = "babygirl.jpg", target_size = (224, 224), hard_detection_failure = False, detector_backend = "opencv")

@@ -327,7 +327,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, hard_detection_failure = False, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -365,8 +365,13 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 			break
 		
 		pbar.set_description("Processing frame %s " % frame_index)
-		
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		#try:
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		"""
+		except Exception as err:
+			frame_info = None
+			print("\nException while processing frame.\n", err)
+		"""
 		if(frame_info is not None):
 			frames_info.append(frame_info)
 		
@@ -377,21 +382,19 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
-
-	face_detected = False
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, hard_detection_failure = False, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	resolution = img.shape 
-
+	
 	faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = align)
 	
 	detected_faces = []
 	frame_info = {"frame_index": frame_index}
 	for face, (x, y, w, h) in faces:
 		#if w > 130: #discard small detected faces				
-
-		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add, db_path = db_path)
-
+		
+		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, hard_detection_failure = hard_detection_failure, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add, db_path = db_path)
+		
 		if(not process_only): #show the rectangles and texts without returning them.
 			if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
 				face_inform(face_info, img)
@@ -406,7 +409,7 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 			frame_info["detected_faces"] = detected_faces
 			return frame_info
 
-def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False, db_path = "."):
+def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, hard_detection_failure = False, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False, db_path = "."):
 	"""
 	This will return everything related to the detected face.
 	'face' parameter is a numpy array of a cropped face
@@ -443,20 +446,21 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 	}
 
 	#process emotion
-	if(emotion_model is not None):
+	if emotion_model is not None:
 		mood_items = get_emotions(detected_face, emotion_model, detector_backend = detector_backend)
 		face_info["mood"] = mood_items
 
 	#-------------------------------
 	#face recognition
-	face = functions.preprocess_face(img = face, target_size = (target_size[0], target_size[1]), hard_detection_failure = False, detector_backend = detector_backend) #preprocess_face was used in DeepFace.quick_represent and by default it chooses 1 face among many in the img passed as argument, but here it takes already a cropped face as img and it's fine.
+
+	face = functions.preprocess_face(img = face, target_size = (target_size[0], target_size[1]), hard_detection_failure = hard_detection_failure, detector_backend = detector_backend) #preprocess_face was used in DeepFace.quick_represent and by default it chooses 1 face among many in the img passed as argument, but here it takes already a cropped face as img and it's fine.
 	
 	#custom normalization. It wasn't originally part of analysis function in realtime.py
 	face = functions.normalize_input(img = face, normalization = normalization)
 
 	input_shape = (target_size[1], target_size[0])
 	#check preprocess_face function handled
-	if(face.shape[1:3] == input_shape and df.shape[0] > 0): #if there are images to verify, apply face recognition
+	if face.shape[1:3] == input_shape and df.shape[0] > 0: #if there are images to verify, apply face recognition
 		target_representation = model.predict(face)[0,:]
 		#face_info["representation"] = target_representation
 		employee_name, employee_relative_path, best_distance = get_most_similar_candidate(df, target_representation, threshold, img_type = img_type)
@@ -465,7 +469,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			"relative_path": employee_relative_path,
 			"distance": best_distance
 		}
-		if(best_distance > threshold and auto_add): #save face to database but don't add it to embeddings now. We give the user the chance to rename the new .jpg file as he wishes, then he runs the app again then they'll be added to embeddings 
+		if best_distance > threshold and auto_add: #save face to database but don't add it to embeddings now. We give the user the chance to rename the new .jpg file as he wishes, then he runs the app again then they'll be added to embeddings 
 			if not os.path.isdir(db_path + "/auto_add"):
 				os.mkdir(db_path + "/auto_add")
 

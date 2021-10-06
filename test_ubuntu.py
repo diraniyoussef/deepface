@@ -5,9 +5,11 @@
 #DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database2', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/teta image.mp4', actions = [], number_of_processes = 1)
 #  
 if __name__ == "__main__":
-	from deepface import instructions
+	#from deepface import instructions
 	from deepface import DeepFace
 
-	instructions.instructions()
-	DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/6seconds.mp4', actions = [], number_of_processes = 2, auto_add = True)
-	#DeepFace.play_with_annotations("C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/trial2.mp4", "C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database/frames_info_trial2.pkl", speed = "slow", fps = 30, im_size = (960, 540))
+	#instructions.instructions()
+	#DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/me.mp4', model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine')
+	DeepFace.play_with_annotations("C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/me.mp4", "C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database/frames_info_me.pkl", speed = "slow", fps = 30, im_size = (960, 540))
+
+

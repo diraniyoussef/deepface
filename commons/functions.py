@@ -164,30 +164,30 @@ def preprocess_already_detected_face(img, region, target_size=(224, 224), graysc
 
 	#img might be path, base64 or numpy array. Convert it to numpy whatever it is.
 	img = load_image(img)
-	
+	base_img = img.copy() #it's not important here I guess
+
 	#img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, hard_detection_failure = hard_detection_failure, align = align)
 
-	continue_preprocess_face(img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
+	return continue_preprocess_face(img, base_img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
 
 def preprocess_face(img, target_size=(224, 224), grayscale = False, hard_detection_failure = True, detector_backend = 'opencv', return_region = False, align = True):
 
 	#img might be path, base64 or numpy array. Convert it to numpy whatever it is.
 	
 	img = load_image(img)
-	#base_img = img.copy()
+	base_img = img.copy()
 
 	img, region = detect_face(img = img, detector_backend = detector_backend, grayscale = grayscale, hard_detection_failure = hard_detection_failure, align = align)
 	
-	continue_preprocess_face(img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
+	return continue_preprocess_face(img, base_img, region, target_size= target_size, grayscale= grayscale, hard_detection_failure= hard_detection_failure, return_region= return_region)
 	
-def continue_preprocess_face(img, region, target_size=(224, 224), grayscale = False, hard_detection_failure = True, return_region = False):
+def continue_preprocess_face(img, base_img, region, target_size=(224, 224), grayscale = False, hard_detection_failure = True, return_region = False):
 	
-	base_img = img.copy()
 
 	if img.shape[0] == 0 or img.shape[1] == 0:
 		if hard_detection_failure == True:
 			raise ValueError("Detected face shape is ", img.shape,". Consider to set hard_detection_failure argument to False.")
-		else: #restore base image. This case is wrong ! it will throw an exception error below (dividing by 0)
+		else: #restore base image. This works in case base_img was different than img, as if we are discovering the faces inside, not that we know it's a face.
 			img = base_img.copy()
 	
 	#--------------------------

@@ -24,8 +24,8 @@ if tf_version == 2:
 
 from deepface.detectors import FaceDetector
 import cv2
-import re
 import threading
+import youtube_dl
 
 def build_model(model_name):
 
@@ -470,7 +470,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 def get_model(model_name): # needed for the pool
 	return build_model(model_name)
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", process_only = True, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", youtube = False, process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
@@ -530,8 +530,9 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	One good feature is to allow the user while replaying to tag a face and add it to the database, and perhaps change the tag of a face. But auto-add somehow plays the same role when supervised by the supervisor (user).
 
 	Make a script so that when double clicked it prepends all the images inside with a name given by the user.
-	"""
 
+	cv2 is not really well with webm ?
+	"""
 
 	functions1.print_license()
 	print("Version 1.0\n\n\n")
@@ -633,8 +634,18 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	functions1.save_pkl(content = embeddings, exact_path = pkl_path)
 
-	if source == "":
+	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
+
+	if source == "":		
 		return None
+
+	if not youtube: 
+		if not os.path.isfile(source):
+			print("video file is not on disk")
+			return None
+		if source.split("/")[-1] not in video_type:
+			print("make sure the extension of the video source matches one of the following: ", video_type)
+			return None
 
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
 	df['distance_metric'] = distance_metric
@@ -646,7 +657,14 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		emotion_model = build_model('Emotion')
 		print("Emotion model loaded")
 
-	cap = cv2.VideoCapture(source) #webcam or path to video file
+	if not youtube:
+		cap = cv2.VideoCapture(source) #webcam or path to video file
+	else:
+		cap, width, height, youtube_title, youtube_vid_ext = functions1.get_youtube_cap(source, video_type)
+
+	if not cap.isOpened():
+		print('video not opened')
+		return None
 
 	frames_info_name = ""
 
@@ -681,10 +699,22 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		
 		#save the frames info in a pkl file
 		if frames_info is not None:
-			print("Saving frames info of the stream to a pkl file...")
-			frames_info_name = source
-			frames_info_name = frames_info_name.split("/")[-1].replace(".mp4", "")
-			#frames_info_name = frames_info_name.split("/")[-1].replace(".webm", "") #cv2 is not really well with webm ?
+			if not youtube :
+				print("Saving frames info of the stream to a pkl file...")
+				frames_info_name = source			
+				vid_ext = functions1.get_source_extension(frames_info_name, video_type)
+				frames_info_name = frames_info_name.split("/")[-1].replace(vid_ext, "")				
+			else:
+				frames_info_name = youtube_title.replace("\\","").lower()
+				frames_info_name = frames_info_name.replace("/","")
+				frames_info_name = frames_info_name.replace(":","")
+				frames_info_name = frames_info_name.replace("*","")
+				frames_info_name = frames_info_name.replace("?","")
+				frames_info_name = frames_info_name.replace("\"","")
+				frames_info_name = frames_info_name.replace("<","")
+				frames_info_name = frames_info_name.replace(">","")
+				frames_info_name = frames_info_name.replace("|","")
+			
 			frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
 			frames_info_name = frames_info_name.replace("-", "_").lower()
 			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
@@ -693,7 +723,6 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			print("Done saving")
 		else:
 			print("no face was detected in this stream")
-	
 			
 	#kill open cv things
 	cap.release()

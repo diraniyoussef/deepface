@@ -1,6 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import re
+import youtube_dl
 
 import imageio
 
@@ -66,6 +67,35 @@ def validate_win_path(path):
 		#path = path.strip("'")
 	return path
 
+def get_source_extension(source, video_type):
+	for vid_ext in video_type:
+		if source.rfind(vid_ext) + len(vid_ext) == len(source):	# to make sure it's in the end of the string
+			return vid_ext
+	return ""
+
+def get_youtube_cap(url, video_type):
+	# create youtube-dl object
+	ydl = youtube_dl.YoutubeDL({})
+	
+	# set video url, extract video information
+	info_dict = ydl.extract_info(url, download=False)
+	
+	# get video formats available
+	formats = info_dict.get('formats',None)
+	
+	for vid_ext in video_type:
+		for f in formats:
+			if f.get('ext', "") == vid_ext[1:]:
+				#get the video url
+				url = f.get('url', "")
+				height = f.get('height', None)
+				width = f.get('width', None)
+				title = f.get('title', "")
+				# open url with opencv
+				cap = cv2.VideoCapture(url)				
+				return cap, width, height, title, vid_ext
+	
+	return None, None, None, None, None
 
 def check_change(db_path=".", img_type = (".jpeg", ".jpg", ".png", ".bmp")): #this whole function can be called in its own thread
 	"""
@@ -179,8 +209,8 @@ def check_git_and_update_embeddings(embeddings, model_name, represent, pkl_path,
 
 def get_employees(db_path = ".", img_type = (".jpg", ".jpeg", ".bmp", ".png"), path_type = "exact"):
 	"""
-    if path_type is "relative" the function returns list of relative paths of images i.e. path starting from the db_path excluding it. (any other keyword than "exact" will be considered as "relative")
-    elif path_type is "exact" the function returns list of exact paths i.e. path starting from the db_path including.
+	if path_type is "relative" the function returns list of relative paths of images i.e. path starting from the db_path excluding it. (any other keyword than "exact" will be considered as "relative")
+	elif path_type is "exact" the function returns list of exact paths i.e. path starting from the db_path including.
 	"""
 	employees = []
 	for r, d, f in os.walk(db_path): # r=root, d=directories, f = files
@@ -192,7 +222,7 @@ def get_employees(db_path = ".", img_type = (".jpg", ".jpeg", ".bmp", ".png"), p
 			for t in img_type:
 				if (file.lower().endswith(t)):
 					path = r + "/" + file # exact path
-                    #exact_path = os.path.join(r, file)
+					#exact_path = os.path.join(r, file)
 					if(path_type != "exact"): # relative path
 						path = path[len(db_path) + 1:] # +1 for the '/' after db_path and before relative path
 					employees.append(path)
@@ -429,7 +459,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 			['Neutral', percentage]
 		],
 		"representation": e.g. array([ 0.00743464,  0.00669238, -0.00143091, ...,  0.00044229,
-        0.01007347,  0.03110152], dtype=float32), #can be omitted to save space when saving the pkl file
+		0.01007347,  0.03110152], dtype=float32), #can be omitted to save space when saving the pkl file
 		"most_similar": {
 			"name": employee_name,
 			"relative_path": employee_relative_path,
@@ -691,7 +721,7 @@ def face_inform(face_info, img): #face_info represents only 1 face
 			except Exception as err:
 				print(str(err))
 			"""	
-			cv2.putText(img, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1)
+			cv2.putText(img, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 		
 	
 	pass

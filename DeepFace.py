@@ -470,7 +470,7 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 def get_model(model_name): # needed for the pool
 	return build_model(model_name)
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", youtube = False, process_only = True, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_only = True, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
@@ -493,6 +493,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	distance_metric : "cosine", "euclidean", "euclidean_l2"
 	detector_backend : "retinaface", "mtcnn", "opencv", "ssd" or "dlib"
 	normalization : "base", "raw", "Facenet", "Facenet2018", "VGGFace", "VGGFace2", "ArcFace" (it's there in functions.normalize_input)
+	source_type : "disk", "youtube", "cam"
  
 	#TODO
 	launch it from the terminal or the cmd prompt --DONE
@@ -521,7 +522,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	Do the ensemble model if it provides better accurracy.
 
-	I guess Arabic names don't work ?
+	Arabic name for a video on disk works fine and it even saves the frames pkl with the Arabic name as well. 
 
 	It would be interesting that in the process of finding representations of the images in the database to select a rectangle around the image. This way the user can make sure that the correct face is truly selected. On another hand, user should not be bothered with this; it's the R&D business.
 	
@@ -532,6 +533,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	Make a script so that when double clicked it prepends all the images inside with a name given by the user.
 
 	cv2 is not really well with webm ?
+
+	Does it work if a database does not contain any image ?
 	"""
 
 	functions1.print_license()
@@ -572,8 +575,6 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	input_shape_x = input_shape[0]; input_shape_y = input_shape[1]
 
 	#------------------------
-
-	text_color = (255,255,255)
 
 	employees = []
 	img_type = (".jpg", ".jpeg", ".bmp", ".png")
@@ -639,11 +640,11 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	if source == "":		
 		return None
 
-	if not youtube: 
+	if source_type == "disk": 
 		if not os.path.isfile(source):
 			print("video file is not on disk")
 			return None
-		if source.split("/")[-1] not in video_type:
+		if functions1.get_source_extension(source, video_type) not in video_type:
 			print("make sure the extension of the video source matches one of the following: ", video_type)
 			return None
 
@@ -657,10 +658,24 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		emotion_model = build_model('Emotion')
 		print("Emotion model loaded")
 
-	if not youtube:
-		cap = cv2.VideoCapture(source) #webcam or path to video file
-	else:
-		cap, width, height, youtube_title, youtube_vid_ext = functions1.get_youtube_cap(source, video_type)
+	if source_type != "youtube":
+		cap = cv2.VideoCapture(source) #cam or path to video file
+	elif source_type == "youtube":
+		youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps, url = functions1.get_youtube_info(source, video_type) #title is a string and the rest are lists
+		print("This is a list of available formats of {} video. Please choose the desired format by entering the index.".format(youtube_title))
+		print("index","extension", "width", "height", "fps")
+		[print(i, youtube_ext[i], youtube_width[i], youtube_height[i], youtube_fps[i]) for i in range(len(youtube_ext))]
+
+		youtube_format_index = input("Please enter format index : ")
+		youtube_format_index = int(youtube_format_index)
+
+		if youtube_format_index in range(len(youtube_ext)):
+			print("Thank you. Your chosen format is :", "extension :", youtube_ext[youtube_format_index], "width :", youtube_width[youtube_format_index], "height :", youtube_height[youtube_format_index], "fps :", youtube_fps[youtube_format_index])
+			cap = cv2.VideoCapture(url[youtube_format_index])
+
+		else:
+			print("entered index is not valid. Aborting...")
+			return None
 
 	if not cap.isOpened():
 		print('video not opened')
@@ -688,33 +703,27 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
 			cv2.imshow('img',img)
 		
 	else: #process_only
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		
 		#save the frames info in a pkl file
 		if frames_info is not None:
-			if not youtube :
+			if source_type == "disk":
 				print("Saving frames info of the stream to a pkl file...")
 				frames_info_name = source			
 				vid_ext = functions1.get_source_extension(frames_info_name, video_type)
 				frames_info_name = frames_info_name.split("/")[-1].replace(vid_ext, "")				
-			else:
-				frames_info_name = youtube_title.replace("\\","").lower()
-				frames_info_name = frames_info_name.replace("/","")
-				frames_info_name = frames_info_name.replace(":","")
-				frames_info_name = frames_info_name.replace("*","")
-				frames_info_name = frames_info_name.replace("?","")
-				frames_info_name = frames_info_name.replace("\"","")
-				frames_info_name = frames_info_name.replace("<","")
-				frames_info_name = frames_info_name.replace(">","")
-				frames_info_name = frames_info_name.replace("|","")
-			
+			elif source_type == "youtube":
+				frames_info_name = youtube_title.replace("\\","").replace("/","").replace(":","").replace("*","").replace("?","").replace("\"","").replace("<","").replace(">","").replace("|","").lower()
+			elif source_type == "cam":
+				frames_info_name = "cam"
+
 			frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
 			frames_info_name = frames_info_name.replace("-", "_").lower()
 			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
@@ -732,7 +741,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	return frames_info_name
 
-def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, im_size = ()):
+def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, processing_video_size = (), output_video_size = ()):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file.
@@ -747,6 +756,7 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	show time of the video
 	allow a pause, rewind and forward buttons
 	"""
+
 	functions1.print_license()
 	print("Version 1.0\n\n\n")
 	
@@ -768,7 +778,7 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	frame_info_index = 0
 	frame_index = 0
 
-	cap = cv2.VideoCapture(source) #webcam or path to video file
+	cap = cv2.VideoCapture(source) #path to video file
 	
 	#if(frames_info is not None):
 	ret = True
@@ -778,6 +788,9 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 		if img is None:
 			break
 		
+		if processing_video_size != ():
+			img = cv2.resize(img, processing_video_size) 
+
 		# Extracting frames info...
 		if(frame_info_index < len(frames_info) and frames_info[frame_info_index]["frame_index"] == frame_index):
 			#the frames_info item of index frame_info_index has some face(s) inside
@@ -788,8 +801,10 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 		
 		frame_index += 1
 		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
-		if(im_size != ()):
-			img = cv2.resize(img, im_size) 
+		
+		if output_video_size != ():
+			img = cv2.resize(img, output_video_size) 
+
 		cv2.imshow(window_name,img)
 
 	cap.release()

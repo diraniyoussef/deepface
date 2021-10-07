@@ -73,29 +73,32 @@ def get_source_extension(source, video_type):
 			return vid_ext
 	return ""
 
-def get_youtube_cap(url, video_type):
+def get_youtube_info(url, video_type):
 	# create youtube-dl object
 	ydl = youtube_dl.YoutubeDL({})
 	
 	# set video url, extract video information
 	info_dict = ydl.extract_info(url, download=False)
 	
+	title = info_dict.get('title', "")
+	
 	# get video formats available
 	formats = info_dict.get('formats',None)
 	
+	ext = []; width = []; height = []; fps = []; url = []
+
 	for vid_ext in video_type:
 		for f in formats:
-			if f.get('ext', "") == vid_ext[1:]:
+			if f.get('ext', "") == vid_ext[1:]:			
+				#getting data
+				ext.append(vid_ext)
+				width.append(f.get('width', None))
+				height.append(f.get('height', None))				
+				fps.append(f.get('fps', None))
 				#get the video url
-				url = f.get('url', "")
-				height = f.get('height', None)
-				width = f.get('width', None)
-				title = f.get('title', "")
-				# open url with opencv
-				cap = cv2.VideoCapture(url)				
-				return cap, width, height, title, vid_ext
-	
-	return None, None, None, None, None
+				url.append(f.get('url', ""))
+				
+	return title, ext, width, height, fps, url
 
 def check_change(db_path=".", img_type = (".jpeg", ".jpg", ".png", ".bmp")): #this whole function can be called in its own thread
 	"""
@@ -357,7 +360,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -396,7 +399,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 		
 		pbar.set_description("Processing frame %s " % frame_index)
 		#try:
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		"""
 		except Exception as err:
 			frame_info = None
@@ -412,9 +415,12 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, detector
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (),detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
-	resolution = img.shape 
+	if processing_video_size != ():
+		img = cv2.resize(img, processing_video_size)
+
+	resolution = img.shape
 	
 	faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = align)
 	

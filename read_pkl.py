@@ -1,6 +1,6 @@
 import pickle
 #pkl_file = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database/representations_deepface.pkl'
-pkl_file = r'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database\frames_info_trial2.pkl'
+pkl_file = r'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database\frames_info_الأهل و التلاميذ و الفصحى.pkl'
 #pkl_file = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1/frames_info_teta image.pkl'
 
 with open(pkl_file, 'rb') as f:
@@ -15,7 +15,7 @@ while i < len(pkl_data):
     print(i, pkl_data[i][0])
     i += 1
 
-"""
+
 person = []
 i = -1
 for pkl_item in pkl_data:
@@ -26,3 +26,4 @@ for pkl_item in pkl_data:
             person.append([i, name, pkl_item['frame_index']])
 
 print(person)
+"""

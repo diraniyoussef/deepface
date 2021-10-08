@@ -73,14 +73,25 @@ def get_source_extension(source, video_type):
 			return vid_ext
 	return ""
 
-def get_youtube_info(url, video_type):
-	def get_youtube_info():		
+def get_video_name(source_type, source, youtube_title, video_type):
+	if source_type == "disk":
+		print("Saving frames info of the stream to a pkl file...")
+		frames_info_name = source			
+		vid_ext = get_source_extension(frames_info_name, video_type)
+		frames_info_name = frames_info_name.split("/")[-1].replace(vid_ext, "")				
+	elif source_type == "youtube":
+		frames_info_name = youtube_title.replace("\\","").replace("/","").replace(":","").replace("*","").replace("?","").replace("\"","").replace("<","").replace(">","").replace("|","").lower()
+	elif source_type == "cam":
+		frames_info_name = "cam"
+	return frames_info_name
+
+def get_youtube_info(url, video_type):	
+	def get_youtube_info(url):		
 		# create youtube-dl object
 		ydl = youtube_dl.YoutubeDL({})
 		
 		# set video url, extract video information
 		info_dict = ydl.extract_info(url, download=False)
-		
 		title = info_dict.get('title', "")
 		
 		# get video formats available
@@ -101,7 +112,7 @@ def get_youtube_info(url, video_type):
 					
 		return title, ext, width, height, fps, url
 	
-	youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps, url = get_youtube_info() #title is a string and the rest are lists
+	youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps, url = get_youtube_info(url) #title is a string and the rest are lists
 	print("This is a list of available formats of {} video. Please choose the desired format by entering the index.".format(youtube_title))
 	print("index","extension", "width", "height", "fps")
 	[print(i, youtube_ext[i], youtube_width[i], youtube_height[i], youtube_fps[i]) for i in range(len(youtube_ext))]
@@ -110,7 +121,7 @@ def get_youtube_info(url, video_type):
 	youtube_format_index = int(youtube_format_index)
 
 	if youtube_format_index in range(len(youtube_ext)):
-		print("Thank you. Your chosen format is :", "extension :", youtube_ext[youtube_format_index], "width :", youtube_width[youtube_format_index], "height :", youtube_height[youtube_format_index], "fps :", youtube_fps[youtube_format_index])
+		print("Thank you. Your chosen format is :", "\textension :", youtube_ext[youtube_format_index], "\twidth :", youtube_width[youtube_format_index], "\theight :", youtube_height[youtube_format_index], "\tfps :", youtube_fps[youtube_format_index])
 		cap = cv2.VideoCapture(url[youtube_format_index])
 		return cap, youtube_title, youtube_ext[youtube_format_index], youtube_width[youtube_format_index], youtube_height[youtube_format_index], youtube_fps[youtube_format_index]
 	else:
@@ -377,7 +388,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), frames_info_name= "", detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -407,10 +418,9 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 	if(video_frames_length != -1): #it's -1 if source was 0 (built-in camera)
 		pbar = tqdm(range(0, video_frames_length), position= 0)
 	
-	ret = True
-	while(not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True):	
-		ret, img = cap.read() 
-		
+	ret, img = cap.read() 
+	cv2.imshow(frames_info_name,img) # this is needed for cv2.waitKey to work, and it's put outside the while loop to relieve the processor. Documentation says it here https://docs.opencv.org/2.4/modules/highgui/doc/user_interface.html#waitkey : "The function only works if there is at least one HighGUI window created and the window is active. If there are several HighGUI windows, any of them can be active."
+	while not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True:	
 		if img is None:
 			break
 		
@@ -426,7 +436,9 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 			frames_info.append(frame_info)
 		
 		frame_index += 1
-		pbar.update()
+		pbar.update()		
+
+		ret, img = cap.read() 
 	
 	pbar.set_description("Done frames processing.")
 

@@ -481,9 +481,9 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	This pkl file is a list of dictionaries, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
 	N.B: Some statistics cannot be exaggerated with their result, since we only get (for now at least) from 1 camera and it won't show a target person all the time, besides, this emotion recognition lacks continuity, e.g. I suspect that it will detect happiness while the person is actually feeling bad, but still it holds some valuable info, like e.g. how long can a person maintain an "apparent" feeling.
 	4) If actions = [] then this function only applies face recognition to a stream. We check each and every frame for recognition only. If actions = ['emotion'] then preferrably be it an offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. Anyway we have the option, probably in another function, of being recorded so that at replay time one can check the emotions continuously. 
-	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons. 
+	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons.
 	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
-	7) source can be an YouTube video. --TODO
+	7) source can be an YouTube video.
 	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Allowing pressing 1 to abort long running processes an terminate the program. --TODO Even later we can use distribute processes on multiple computers. --TODO
 	9) make an expiration license for the software so that it can be distributable to the user. --TODO
 	
@@ -530,7 +530,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	One good feature is to allow the user while replaying to tag a face and add it to the database, and perhaps change the tag of a face. But auto-add somehow plays the same role when supervised by the supervisor (user).
 
-	Make a script so that when double clicked it prepends all the images inside with a name given by the user.
+	Make a script so that when double clicked it prepends all the images inside with a name given by the user. - DONE
 
 	cv2 is not really well with webm ?
 
@@ -547,7 +547,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	#check passed db folder exists
 	db_path = functions1.validate_win_path(db_path)
 
-	if os.path.isdir(db_path) == False:
+	if path.isdir(db_path) == False:
 		print("Provided database is not a valid directory/folder.\nStopping execution.")
 		return None	
 	#------------------------
@@ -641,7 +641,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		return None
 
 	if source_type == "disk": 
-		if not os.path.isfile(source):
+		if not path.isfile(source):
 			print("video file is not on disk")
 			return None
 		if functions1.get_source_extension(source, video_type) not in video_type:
@@ -658,18 +658,21 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		emotion_model = build_model('Emotion')
 		print("Emotion model loaded")
 
+	youtube_title = ""
 	if source_type != "youtube":
-		cap = cv2.VideoCapture(source) #cam or path to video file
+		cap = cv2.VideoCapture(source) #cam or path to video file on disk
 	elif source_type == "youtube":
 		cap, youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps = functions1.get_youtube_info(source, video_type)
 		if cap is None:
 			return None
 
-	if not cap.isOpened():
+	if not cap.isOpened(): #you may put this condition in the while loop of cap.read
 		print('video not opened')
 		return None
 
-	frames_info_name = ""
+	frames_info_name = functions1.get_video_name(source_type, source, youtube_title, video_type)
+
+	print("Please press q to stop processing...")
 
 	if(not process_only):	
 		#here we think realtime		
@@ -692,26 +695,16 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
 			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
-			cv2.imshow('img',img)
+			cv2.imshow(frames_info_name,img)
 		
 	else: #process_only
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, frames_info_name= frames_info_name, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		
 		#save the frames info in a pkl file
-		if frames_info is not None:
-			if source_type == "disk":
-				print("Saving frames info of the stream to a pkl file...")
-				frames_info_name = source			
-				vid_ext = functions1.get_source_extension(frames_info_name, video_type)
-				frames_info_name = frames_info_name.split("/")[-1].replace(vid_ext, "")				
-			elif source_type == "youtube":
-				frames_info_name = youtube_title.replace("\\","").replace("/","").replace(":","").replace("*","").replace("?","").replace("\"","").replace("<","").replace(">","").replace("|","").lower()
-			elif source_type == "cam":
-				frames_info_name = "cam"
-
+		if frames_info is not None:			
 			frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
 			frames_info_name = frames_info_name.replace("-", "_").lower()
 			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
@@ -727,7 +720,35 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	print("Done with enhanced_stream")
 
-	return frames_info_name
+	return frames_info
+
+def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+	"""
+	This function is originally made to be used in the auto_add folder. The images there are number followed by the .jpg extension e.g. So the purpose of this function is to prepend to these images the name of the guy whom enhanced_stream function has previously collected the images to.
+	"""
+
+	#check passed db folder exists
+	
+	imgs_path = functions1.validate_win_path(imgs_path)	
+	
+	if path.isdir(imgs_path) == False:
+		print("Provided folder is not a valid directory/folder.\nStopping execution.")
+		return None
+	
+	#-------------------------
+
+	#name = input("Please specify the name of the person you want the images to be renamed to :\n")
+
+	for r, d, f in os.walk(imgs_path): # r=root, d=directories, f = files
+		
+		if r != imgs_path: #we want just the first level images to be renamed, that is the ones just below imgs_path
+			continue
+		
+		for file in f:
+			for t in img_type:
+				if (file.lower().endswith(t)):
+					os.rename(r + "/" + file, r + "/"  + name + file)
+
 
 def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
 	"""
@@ -768,10 +789,22 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	frame_info_index = 0
 	frame_index = 0
 
+	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
 
+	if source == "":		
+		return None
 
-	cap = cv2.VideoCapture(source) #path to video file
-	
+	if source_type != "youtube":
+		cap = cv2.VideoCapture(source) #cam or path to video file
+	elif source_type == "youtube":
+		cap, youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps = functions1.get_youtube_info(source, video_type)
+		if cap is None:
+			return None
+
+	if not cap.isOpened():
+		print('video not opened')
+		return None
+
 	#if(frames_info is not None):
 	ret = True
 	while(not (cv2.waitKey(wait_key_time) & 0xFF == ord('q')) and ret == True):
@@ -849,7 +882,7 @@ def find(img_path, db_path, model_name ='VGG-Face', distance_metric = 'cosine', 
 
 	#-------------------------------
 
-	if os.path.isdir(db_path) == True:
+	if path.isdir(db_path) == True:
 
 		models = functions1.get_models(build_model, model_name, model)
 

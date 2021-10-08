@@ -494,7 +494,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	detector_backend : "retinaface", "mtcnn", "opencv", "ssd" or "dlib"
 	normalization : "base", "raw", "Facenet", "Facenet2018", "VGGFace", "VGGFace2", "ArcFace" (it's there in functions.normalize_input)
 	source_type : "disk", "youtube", "cam"
- 
+
 	#TODO
 	launch it from the terminal or the cmd prompt --DONE
 
@@ -661,20 +661,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	if source_type != "youtube":
 		cap = cv2.VideoCapture(source) #cam or path to video file
 	elif source_type == "youtube":
-		youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps, url = functions1.get_youtube_info(source, video_type) #title is a string and the rest are lists
-		print("This is a list of available formats of {} video. Please choose the desired format by entering the index.".format(youtube_title))
-		print("index","extension", "width", "height", "fps")
-		[print(i, youtube_ext[i], youtube_width[i], youtube_height[i], youtube_fps[i]) for i in range(len(youtube_ext))]
-
-		youtube_format_index = input("Please enter format index : ")
-		youtube_format_index = int(youtube_format_index)
-
-		if youtube_format_index in range(len(youtube_ext)):
-			print("Thank you. Your chosen format is :", "extension :", youtube_ext[youtube_format_index], "width :", youtube_width[youtube_format_index], "height :", youtube_height[youtube_format_index], "fps :", youtube_fps[youtube_format_index])
-			cap = cv2.VideoCapture(url[youtube_format_index])
-
-		else:
-			print("entered index is not valid. Aborting...")
+		cap, youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps = functions1.get_youtube_info(source, video_type)
+		if cap is None:
 			return None
 
 	if not cap.isOpened():
@@ -741,12 +729,14 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	return frames_info_name
 
-def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, processing_video_size = (), output_video_size = ()):
+def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
-	source is the path to the mp4 file.
+	source is the path to the mp4 file or the link to a public youtube video.
 	speed can be either "fast", "slow", or "normal".
 	fps is usually left to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
+	source_type : "disk", "youtube"
+
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
 	im_size is e.g. (960, 540)
 
@@ -777,6 +767,8 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	print("Playing the stream with annotations...\nPress q to abort")
 	frame_info_index = 0
 	frame_index = 0
+
+
 
 	cap = cv2.VideoCapture(source) #path to video file
 	

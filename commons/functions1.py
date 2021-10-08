@@ -74,31 +74,48 @@ def get_source_extension(source, video_type):
 	return ""
 
 def get_youtube_info(url, video_type):
-	# create youtube-dl object
-	ydl = youtube_dl.YoutubeDL({})
-	
-	# set video url, extract video information
-	info_dict = ydl.extract_info(url, download=False)
-	
-	title = info_dict.get('title', "")
-	
-	# get video formats available
-	formats = info_dict.get('formats',None)
-	
-	ext = []; width = []; height = []; fps = []; url = []
+	def get_youtube_info():		
+		# create youtube-dl object
+		ydl = youtube_dl.YoutubeDL({})
+		
+		# set video url, extract video information
+		info_dict = ydl.extract_info(url, download=False)
+		
+		title = info_dict.get('title', "")
+		
+		# get video formats available
+		formats = info_dict.get('formats',None)
+		
+		ext = []; width = []; height = []; fps = []; url = []
 
-	for vid_ext in video_type:
-		for f in formats:
-			if f.get('ext', "") == vid_ext[1:]:			
-				#getting data
-				ext.append(vid_ext)
-				width.append(f.get('width', None))
-				height.append(f.get('height', None))				
-				fps.append(f.get('fps', None))
-				#get the video url
-				url.append(f.get('url', ""))
-				
-	return title, ext, width, height, fps, url
+		for vid_ext in video_type:
+			for f in formats:
+				if f.get('ext', "") == vid_ext[1:]:			
+					#getting data
+					ext.append(vid_ext)
+					width.append(f.get('width', None))
+					height.append(f.get('height', None))				
+					fps.append(f.get('fps', None))
+					#get the video url
+					url.append(f.get('url', ""))
+					
+		return title, ext, width, height, fps, url
+	
+	youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps, url = get_youtube_info() #title is a string and the rest are lists
+	print("This is a list of available formats of {} video. Please choose the desired format by entering the index.".format(youtube_title))
+	print("index","extension", "width", "height", "fps")
+	[print(i, youtube_ext[i], youtube_width[i], youtube_height[i], youtube_fps[i]) for i in range(len(youtube_ext))]
+
+	youtube_format_index = input("Please enter format index : ")
+	youtube_format_index = int(youtube_format_index)
+
+	if youtube_format_index in range(len(youtube_ext)):
+		print("Thank you. Your chosen format is :", "extension :", youtube_ext[youtube_format_index], "width :", youtube_width[youtube_format_index], "height :", youtube_height[youtube_format_index], "fps :", youtube_fps[youtube_format_index])
+		cap = cv2.VideoCapture(url[youtube_format_index])
+		return cap, youtube_title, youtube_ext[youtube_format_index], youtube_width[youtube_format_index], youtube_height[youtube_format_index], youtube_fps[youtube_format_index]
+	else:
+		print("entered index is not valid. Aborting...")
+		return None, None, None, None, None, None
 
 def check_change(db_path=".", img_type = (".jpeg", ".jpg", ".png", ".bmp")): #this whole function can be called in its own thread
 	"""

@@ -637,16 +637,8 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
 
-	if source == "":		
+	if not functions1.is_valid_disk_source_file(source, source_type, video_type) :
 		return None
-
-	if source_type == "disk": 
-		if not path.isfile(source):
-			print("video file is not on disk")
-			return None
-		if functions1.get_source_extension(source, video_type) not in video_type:
-			print("make sure the extension of the video source matches one of the following: ", video_type)
-			return None
 
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
 	df['distance_metric'] = distance_metric
@@ -750,7 +742,7 @@ def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", 
 					os.rename(r + "/" + file, r + "/"  + name + file)
 
 
-def play_with_annotations(source, frames_info_path, window_name = "img", speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
+def play_with_annotations(source, frames_info_path, speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file or the link to a public youtube video.
@@ -771,12 +763,30 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	functions1.print_license()
 	print("Version 1.0\n\n\n")
 	
+	source = functions1.validate_win_path(source)
+
+	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
+
+	if not functions1.is_valid_disk_source_file(source, source_type, video_type): #this does not return false if source_type is youtube
+		return None
+
 	try:
 		with open(frames_info_path, 'rb') as f:
 			frames_info = pickle.load(f)
 	except Exception as err:
 		if(err.args[0] == 2): print("Error while attempting to open file of path \"{}\". Make sure it exists.".format(frames_info_path))
 		return
+
+	frame_info_index = 0
+	frame_index = 0
+
+	youtube_title = ""
+	if source_type != "youtube":
+		cap = cv2.VideoCapture(source) #cam or path to video file
+	elif source_type == "youtube":
+		cap, youtube_title, youtube_ext, youtube_width, youtube_height, fps = functions1.get_youtube_info(source, video_type)
+		if cap is None:
+			return None
 
 	if(speed == "fast"):
 		wait_key_time = int(np.round(1/fps * 1000 / 2))
@@ -785,25 +795,13 @@ def play_with_annotations(source, frames_info_path, window_name = "img", speed =
 	else:
 		wait_key_time = int(np.round(1/fps * 1000))
 
-	print("Playing the stream with annotations...\nPress q to abort")
-	frame_info_index = 0
-	frame_index = 0
-
-	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
-
-	if source == "":		
-		return None
-
-	if source_type != "youtube":
-		cap = cv2.VideoCapture(source) #cam or path to video file
-	elif source_type == "youtube":
-		cap, youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps = functions1.get_youtube_info(source, video_type)
-		if cap is None:
-			return None
+	window_name = functions1.get_video_name(source_type, source, youtube_title, video_type)
 
 	if not cap.isOpened():
 		print('video not opened')
 		return None
+
+	print("Playing the stream with annotations...\nPlease press q to abort")
 
 	#if(frames_info is not None):
 	ret = True

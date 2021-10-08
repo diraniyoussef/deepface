@@ -73,6 +73,20 @@ def get_source_extension(source, video_type):
 			return vid_ext
 	return ""
 
+def is_valid_disk_source_file(source, source_type, video_type):
+	if source == "":		
+		return False
+
+	if source_type == "disk": 
+		if not os.path.isfile(source):
+			print("video file is not on disk")
+			return False
+		if get_source_extension(source, video_type) not in video_type:
+			print("make sure the extension of the video source matches one of the following: ", video_type)
+			return False
+			
+	return True
+
 def get_video_name(source_type, source, youtube_title, video_type):
 	if source_type == "disk":
 		print("Saving frames info of the stream to a pkl file...")

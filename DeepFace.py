@@ -534,7 +534,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	cv2 is not really well with webm ?
 
-	Does it work if a database does not contain any image ?
+	It works well if the database does not contain any image. So user is only interested in auto_add
 	"""
 
 	functions1.print_license()

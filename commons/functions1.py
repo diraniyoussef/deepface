@@ -547,16 +547,18 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 
 	input_shape = (target_size[1], target_size[0])
 	#check preprocess_face function handled
-	if face.shape[1:3] == input_shape and df.shape[0] > 0: #if there are images to verify, apply face recognition
-		target_representation = model.predict(face)[0,:]
-		#face_info["representation"] = target_representation
-		employee_name, employee_relative_path, best_distance = get_most_similar_candidate(df, target_representation, threshold, img_type = img_type)
-		face_info["most_similar"] = {
-			"name": employee_name,
-			"relative_path": employee_relative_path,
-			"distance": best_distance
-		}
-		if best_distance > threshold and auto_add: #save face to database but don't add it to embeddings now. We give the user the chance to rename the new .jpg file as he wishes, then he runs the app again then they'll be added to embeddings 
+	if face.shape[1:3] == input_shape: #if there are images to verify, apply face recognition
+		if df.shape[0] > 0:
+			target_representation = model.predict(face)[0,:]
+			#face_info["representation"] = target_representation
+			employee_name, employee_relative_path, best_distance = get_most_similar_candidate(df, target_representation, threshold, img_type = img_type)
+			face_info["most_similar"] = {
+				"name": employee_name,
+				"relative_path": employee_relative_path,
+				"distance": best_distance
+			}
+
+		if auto_add and (df.shape[0] == 0 or best_distance > threshold): #save face to database but don't add it to embeddings now. We give the user the chance to rename the new .jpg file as he wishes, then he runs the app again then they'll be added to embeddings 
 			if not os.path.isdir(db_path + "/auto_add"):
 				os.mkdir(db_path + "/auto_add")
 

@@ -9,12 +9,7 @@ if __name__ == "__main__":
 	from deepface import DeepFace
 
 	#instructions.instructions()
-<<<<<<< HEAD
 	#DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/me.mp4', model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine')
 	DeepFace.play_with_annotations("/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/me.mp4", "/home/youssef/PythonProjects/AI/DeepFace_Project/database1/frames_info_me.pkl", speed = "slow", fps = 30, im_size = (960, 540))
-=======
-	DeepFace.enhanced_stream(db_path = '/home/youssef/PythonProjects/AI/DeepFace_Project/database1', source = '/home/youssef/PythonProjects/AI/DeepFace_Project/make a video/me.mp4', model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine')
-	#DeepFace.play_with_annotations("C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/trial2.mp4", "C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database/frames_info_trial2.pkl", speed = "slow", fps = 30, im_size = (960, 540))
->>>>>>> 3070da419f862372e370719355d65a9319c534ff
 
 

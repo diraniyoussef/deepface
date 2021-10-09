@@ -1,20 +1,20 @@
 #from deepface import instructions
 
-def search_stream(db_path = ".", source = "", source_type = "disk", processing_video_size = (), emotions = False, number_of_processes = 2, auto_add = False):
+def search_stream(images_folder, video_file, video_place = "disk", processing_video_size = (), emotions = False, number_of_processes = 2, auto_add = False):
 	from deepface import DeepFace
 	if emotions:
 		actions = ['emotion']
 	else:
 		actions = []
-	DeepFace.enhanced_stream(db_path = db_path, source = source, source_type = source_type, processing_video_size = processing_video_size, model_name = "VGG-Face", detector_backend="dlib", actions = actions, number_of_processes = number_of_processes, auto_add = auto_add, normalization = "base", distance_metric = 'cosine')
+	DeepFace.enhanced_stream(db_path = images_folder, source = video_file, source_type = video_place, processing_video_size = processing_video_size, model_name = "VGG-Face", detector_backend="dlib", actions = actions, number_of_processes = number_of_processes, auto_add = auto_add, normalization = "base", distance_metric = 'cosine')
 
-def prepend_images_names(images_path = ".", person_name = ""):
+def prepend_images_names(images_folder, person_name):
 	from deepface import DeepFace
-	DeepFace.prepend_imgs_names(imgs_path=images_path, name = person_name)
+	DeepFace.prepend_imgs_names(imgs_path=images_folder, name = person_name)
 
-def play_with_annotations(source, frames_info_path, speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
+def play_with_annotations(video_file, info_file_path, speed = "normal", fps = 30, video_place = "disk", processing_video_size = (), output_video_size = ()):
 	from deepface import DeepFace
-	DeepFace.play_with_annotations(source, frames_info_path, speed= speed, fps= fps, source_type= source_type, processing_video_size= processing_video_size, output_video_size= output_video_size)
+	DeepFace.play_with_annotations(video_file, info_file_path, speed= speed, fps= fps, source_type= video_place, processing_video_size= processing_video_size, output_video_size= output_video_size)
 
 
 if __name__ == "__main__":

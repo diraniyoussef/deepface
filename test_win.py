@@ -1,12 +1,25 @@
-#DeepFace.enhanced_stream(db_path = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database2', source = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\make a video\Zaher and Issa.mp4')
-#DeepFace.enhanced_stream(db_path = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database2', source = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\make a video\selfie.mp4')
-#DeepFace.enhanced_stream(db_path = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database2', source = 'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\make a video\youssef.mp4', actions = [])
-#DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database2', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/teta image.mp4', actions = [], number_of_processes = 1)
-#DeepFace.enhanced_stream(db_path = r'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database3', source = r'C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\make a video\6 seconds.mp4', actions = [], number_of_processes = 2)
+#from deepface import instructions
+
+def search_stream(db_path = ".", source = "", source_type = "disk", processing_video_size = (), emotions = False, number_of_processes = 2, auto_add = False):
+	from deepface import DeepFace
+	if emotions:
+		actions = ['emotion']
+	else:
+		actions = []
+	DeepFace.enhanced_stream(db_path = db_path, source = source, source_type = source_type, processing_video_size = processing_video_size, model_name = "VGG-Face", detector_backend="dlib", actions = actions, number_of_processes = number_of_processes, auto_add = auto_add, normalization = "base", distance_metric = 'cosine')
+
+def prepend_images_names(images_path = ".", person_name = ""):
+	from deepface import DeepFace
+	DeepFace.prepend_imgs_names(imgs_path=images_path, name = person_name)
+
+def play_with_annotations(source, frames_info_path, speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
+	from deepface import DeepFace
+	DeepFace.play_with_annotations(source, frames_info_path, speed= speed, fps= fps, source_type= source_type, processing_video_size= processing_video_size, output_video_size= output_video_size)
+
 
 if __name__ == "__main__":
-	#from deepface import instructions
 	from deepface import DeepFace
+	pass
 	#we won't care much for the slash or back-slash in the paths (especially the \U), since they'll be given by the user as string inputs, so they'll be probably well encoded
 
 	#instructions.instructions()

@@ -742,7 +742,7 @@ def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", 
 					os.rename(r + "/" + file, r + "/"  + name + file)
 
 
-def play_with_annotations(source, frames_info_path, speed = "normal", fps = 30, source_type = "disk", processing_video_size = (), output_video_size = ()):
+def play_with_annotations(source, frames_info_path, source_type = "disk", speed = "normal", fps = 30, processing_video_size = (), output_video_size = ()):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file or the link to a public youtube video.

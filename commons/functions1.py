@@ -529,7 +529,7 @@ def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model 
 
 	#process emotion
 	if emotion_model is not None:
-		mood_items = get_emotions(detected_face, emotion_model, detector_backend = detector_backend)
+		mood_items = get_emotions(detected_face, pos_dim, emotion_model)
 		face_info["mood"] = mood_items
 
 	#-------------------------------
@@ -653,7 +653,7 @@ def face_inform(face_info, img): #face_info represents only 1 face
 	#-------------------------------
 	#emotion
 	mood_items = face_info.get("mood")
-	if(mood_items is not None):
+	if mood_items is not None:
 		emotion_df = pd.DataFrame(mood_items, columns = ["emotion", "score"])
 		emotion_df = emotion_df.sort_values(by = ["score"], ascending=False).reset_index(drop=True)
 
@@ -777,10 +777,20 @@ def face_inform(face_info, img): #face_info represents only 1 face
 	
 	pass
 
-def get_emotions(face, emotion_model, detector_backend = 'opencv'):
-	gray_img = functions.preprocess_face(img = face, target_size = (48, 48), grayscale = True, hard_detection_failure = False, detector_backend = 'opencv')
+def get_emotions(face, region, emotion_model):
+	#gray_img = functions.preprocess_face(img = face, target_size = (48, 48), grayscale = True, hard_detection_failure = False, detector_backend = detector_backend)
+	try:
+		gray_img = functions.preprocess_already_detected_face(img= face, region= region, target_size = (48, 48), grayscale= True, hard_detection_failure = True)
+	except Exception as err:
+		print("should have a face, but an error occurred.")
+		return None
+		
 	emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-	emotion_predictions = emotion_model.predict(gray_img)[0,:]
+	try:
+		emotion_predictions = emotion_model.predict(gray_img)[0,:]
+	except Exception as err:
+		print("should have an emotion, but an error occurred.")
+		return None
 	sum_of_predictions = emotion_predictions.sum()
 
 	mood_items = []

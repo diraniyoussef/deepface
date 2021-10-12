@@ -28,6 +28,3 @@ if __name__ == "__main__":
 	
         print(result[0])
 
-from deepface.commons import functions
-img = functions.preprocess_face(img = "babygirl.jpg", target_size = (224, 224), hard_detection_failure = False, detector_backend = "opencv")
-img = functions.normalize_input(img = img, normalization = "base")

@@ -12,9 +12,9 @@ def prepend_images_names(images_folder, person_name):
 	from deepface import DeepFace
 	DeepFace.prepend_imgs_names(imgs_path=images_folder, name = person_name)
 
-def play_with_annotations(video_file, info_file_path, speed = "normal", fps = 30, video_place = "disk", processing_video_size = (), output_video_size = ()):
+def play_with_annotations(video_file, info_file_path, speed = "normal", fps = 30, video_place = "disk", processing_video_size = (), output_video_size = (), audio = False):
 	from deepface import DeepFace
-	DeepFace.play_with_annotations(video_file, info_file_path, speed= speed, fps= fps, source_type= video_place, processing_video_size= processing_video_size, output_video_size= output_video_size)
+	DeepFace.play_with_annotations(video_file, info_file_path, speed= speed, fps= fps, source_type= video_place, processing_video_size= processing_video_size, output_video_size= output_video_size, audio= audio)
 
 
 if __name__ == "__main__":

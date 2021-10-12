@@ -13,6 +13,8 @@ from git import Repo
 import time
 from multiprocessing import Pool
 
+import moviepy.editor as mp #https://towardsdatascience.com/extracting-audio-from-video-using-python-58856a940fd
+
 from tqdm import tqdm
 import pickle
 
@@ -87,9 +89,8 @@ def is_valid_disk_source_file(source, source_type, video_type):
 			
 	return True
 
-def get_video_name(source_type, source, youtube_title, video_type):
+def get_video_name(source, source_type= "disk", youtube_title = "", video_type= (".mp4", ".flv", ".webm")):
 	if source_type == "disk":
-		print("Saving frames info of the stream to a pkl file...")
 		frames_info_name = source			
 		vid_ext = get_source_extension(frames_info_name, video_type)
 		frames_info_name = frames_info_name.split("/")[-1].replace(vid_ext, "")				
@@ -614,6 +615,19 @@ def get_most_similar_candidate(df, face_representation, threshold, img_type = ("
 	
 	return label, employee_relative_path, best_distance
 		
+def get_audio_wav(video_path, video_type= (".mp4", ".flv", ".webm")):
+	#assuming video is on disk
+	dir = "/".join(video_path.split("/")[:-1])
+	video_name = get_video_name(video_path, video_type= video_type)
+	audio_path = dir + "/" + video_name + ".wav"
+	
+	#getting audio file from video file
+	if not os.path.exists(audio_path):
+		my_clip = mp.VideoFileClip(video_path)	
+		my_clip.audio.write_audiofile(audio_path)
+	
+	return audio_path
+
 def face_inform(face_info, img): #face_info represents only 1 face
 	"""
 	This will show using cv2 the rectangles and texts after extracting them from face_info. 

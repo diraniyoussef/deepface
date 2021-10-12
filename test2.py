@@ -1,5 +1,5 @@
-import moviepy.editor as mp #https://towardsdatascience.com/extracting-audio-from-video-using-python-58856a940fd
 from os import path
+import moviepy.editor as mp #https://towardsdatascience.com/extracting-audio-from-video-using-python-58856a940fd
 import wave
 import pyaudio
 

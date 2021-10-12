@@ -24,8 +24,9 @@ if tf_version == 2:
 
 from deepface.detectors import FaceDetector
 import cv2
+import wave
+import pyaudio
 import threading
-import youtube_dl
 
 def build_model(model_name):
 
@@ -662,7 +663,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		print('video not opened')
 		return None
 
-	frames_info_name = functions1.get_video_name(source_type, source, youtube_title, video_type)
+	frames_info_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
 
 	print("Please press q to stop processing...")
 
@@ -701,6 +702,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 			frames_info_name = frames_info_name.replace("-", "_").lower()
 			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
 			frames_info_name = db_path+"/"+frames_info_name
+			print("Saving frames info of the stream to a pkl file...")
 			functions1.save_pkl(content = frames_info, exact_path = frames_info_name)
 			print("Done saving")
 		else:
@@ -742,7 +744,7 @@ def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", 
 					os.rename(r + "/" + file, r + "/"  + name + file)
 
 
-def play_with_annotations(source, frames_info_path, source_type = "disk", speed = "normal", fps = 30, processing_video_size = (), output_video_size = ()):
+def play_with_annotations(source, frames_info_path, source_type = "disk", speed = "normal", fps = 30, processing_video_size = (), output_video_size = (), audio= False):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file or the link to a public youtube video.
@@ -795,11 +797,27 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	else:
 		wait_key_time = int(np.round(1/fps * 1000))
 
-	window_name = functions1.get_video_name(source_type, source, youtube_title, video_type)
+	window_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
 
 	if not cap.isOpened():
 		print('video not opened')
 		return None
+
+	if audio and source_type == "disk":
+		audio_path = functions1.get_audio_wav(source, video_type= video_type)
+		wf = wave.open(audio_path, 'rb')
+
+		# instantiate PyAudio
+		p = pyaudio.PyAudio()
+
+		audio_rate = wf.getframerate()
+		# open stream
+		stream = p.open(format= p.get_format_from_width(wf.getsampwidth()),
+						channels= wf.getnchannels(),
+						rate= audio_rate,
+						output= True)
+
+		chunk = functions1.get_share(audio_rate, fps)
 
 	print("Playing the stream with annotations...\nPlease press q to abort")
 
@@ -820,16 +838,30 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 			for face_info in frames_info[frame_info_index]["detected_faces"]:
 				functions1.face_inform(face_info, img)
 
-			frame_info_index += 1
-		
-		frame_index += 1
-		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
+			frame_info_index += 1				
 		
 		if output_video_size != ():
 			img = cv2.resize(img, output_video_size) 
-
+		
+		if audio and source_type == "disk":						
+			data = wf.readframes(chunk[frame_index % len(chunk)])
+			if len(data) > 0:
+				stream.write(data) #play audio
+				pass
+			
 		cv2.imshow(window_name,img)
+		
+		frame_index += 1
+		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
+	
+	# stop stream (4)
+	stream.stop_stream()
+	stream.close()
 
+	# close PyAudio (5)
+	p.terminate()
+	
+	#release cv2 capture
 	cap.release()
 	cv2.destroyAllWindows()
 	print("Done with play_with_annotations")

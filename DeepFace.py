@@ -818,6 +818,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 						output= True)
 
 		chunk = functions1.get_share(audio_rate, fps)
+		print(chunk)
 
 	print("Playing the stream with annotations...\nPlease press q to abort")
 
@@ -843,7 +844,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		if output_video_size != ():
 			img = cv2.resize(img, output_video_size) 
 		
-		if audio and source_type == "disk":						
+		if audio and source_type == "disk":				
 			data = wf.readframes(chunk[frame_index % len(chunk)])
 			if len(data) > 0:
 				stream.write(data) #play audio

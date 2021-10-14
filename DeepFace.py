@@ -818,6 +818,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 						output= True)
 
 		chunk = functions1.get_share(audio_rate, fps)
+		chunk = chunk[1:]
 		print(chunk)
 
 	print("Playing the stream with annotations...\nPlease press q to abort")

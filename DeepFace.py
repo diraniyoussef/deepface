@@ -843,7 +843,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		if output_video_size != ():
 			img = cv2.resize(img, output_video_size) 
 		
-		if audio and source_type == "disk":						
+		if audio and source_type == "disk":
 			data = wf.readframes(chunk[frame_index % len(chunk)])
 			if len(data) > 0:
 				stream.write(data) #play audio
@@ -854,12 +854,13 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		frame_index += 1
 		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])
 	
-	# stop stream (4)
-	stream.stop_stream()
-	stream.close()
+	if audio and source_type == "disk":
+		# stop stream (4)
+		stream.stop_stream()
+		stream.close()
 
-	# close PyAudio (5)
-	p.terminate()
+		# close PyAudio (5)
+		p.terminate()
 	
 	#release cv2 capture
 	cap.release()

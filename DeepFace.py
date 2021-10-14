@@ -755,6 +755,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
 	im_size is e.g. (960, 540)
 
+	if audio is set to True it overrides fps
 	
 	TODO
 	Needs to play the sound as well.

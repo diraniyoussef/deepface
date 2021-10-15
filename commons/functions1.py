@@ -628,14 +628,20 @@ def get_audio_wav(video_path, video_type= (".mp4", ".flv", ".webm")):
 	
 	return audio_path
 
-def face_inform(face_info, img): #face_info represents only 1 face
+def face_inform(face_info, img, color= "dark_gray"): #face_info represents only 1 face
 	"""
 	This will show using cv2 the rectangles and texts after extracting them from face_info. 
 	It won't return anything.
 	"""
 	(x, y, w, h) = face_info["pos_dim"]
-	cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image
-	
+	if color == "white":
+		color = (255, 255, 255)
+	elif color == "black":
+		color = (0,0,0)
+	else: #"dark_gray"
+		color = (67, 67, 67)
+
+	cv2.rectangle(img, (x,y), (x+w,y+h), color, 1) #draw rectangle to main image	
 	#-------------------------------
 	#transparency
 	"""
@@ -679,7 +685,7 @@ def face_inform(face_info, img): #face_info represents only 1 face
 		text_location_y = y + h
 		text_location_x = x
 
-		cv2.putText(img, emotion_label, (text_location_x, text_location_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+		cv2.putText(img, emotion_label, (text_location_x, text_location_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 		"""
 		for index, instance in emotion_df.iterrows():
 			emotion_label = "%s " % (instance['emotion'])
@@ -786,7 +792,7 @@ def face_inform(face_info, img): #face_info represents only 1 face
 			except Exception as err:
 				print(str(err))
 			"""	
-			cv2.putText(img, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+			cv2.putText(img, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 		
 	
 	pass

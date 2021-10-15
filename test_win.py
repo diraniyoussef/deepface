@@ -1,8 +1,8 @@
 #from deepface import instructions
 
-def search_stream(images_folder, video_file, video_place = "disk", processing_video_size = (), emotions = False, number_of_processes = 2, auto_add = False):
+def search_stream(images_folder, video_file, video_place = "disk", processing_video_size = (), emotion = False, number_of_processes = 2, auto_add = False):
 	from deepface import DeepFace
-	if emotions:
+	if emotion:
 		actions = ['emotion']
 	else:
 		actions = []
@@ -12,15 +12,16 @@ def prepend_images_names(images_folder, person_name):
 	from deepface import DeepFace
 	DeepFace.prepend_imgs_names(imgs_path=images_folder, name = person_name)
 
-def play_with_annotations(video_file, info_file_path, speed = "normal", fps = 30, video_place = "disk", processing_video_size = (), output_video_size = (), audio = False):
+def play_with_annotations(video_file, info_file, speed = "normal", video_place = "disk", processing_video_size = (), output_video_size = (), audio = False):
 	from deepface import DeepFace
-	DeepFace.play_with_annotations(video_file, info_file_path, speed= speed, fps= fps, source_type= video_place, processing_video_size= processing_video_size, output_video_size= output_video_size, audio= audio)
+	DeepFace.play_with_annotations(video_file, info_file, speed= speed, source_type= video_place, processing_video_size= processing_video_size, output_video_size= output_video_size, audio= audio)
 
 
 if __name__ == "__main__":
-	from deepface import DeepFace
 	pass
 	#we won't care much for the slash or back-slash in the paths (especially the \U), since they'll be given by the user as string inputs, so they'll be probably well encoded
+
+	#test_win.search_stream("C:\Users\Dirani\ProgrammingProjects\DeepFace_Project\database6", "https://www.youtube.com/watch?v=z-BgpfYb_uU", video_place="youtube", auto-add = True)
 
 	#instructions.instructions()
 	#DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/make a video/الأهل و التلاميذ و الفصحى.mp4', processing_video_size = (), model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine') #detector_backend="dlib", detector_backend="mtcnn"

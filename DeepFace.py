@@ -744,18 +744,19 @@ def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", 
 					os.rename(r + "/" + file, r + "/"  + name + file)
 
 
-def play_with_annotations(source, frames_info_path, source_type = "disk", speed = "normal", fps = 0, processing_video_size = (), output_video_size = (), audio= False):
+def play_with_annotations(source, frames_info_path, source_type = "disk", speed = "normal", fps = 0, processing_video_size = (), output_video_size = (), audio= False, color= "dark_gray"):
 	"""
 	frames_info_path is a path to a pkl file holding all annotations information inferred from a video source.
 	source is the path to the mp4 file or the link to a public youtube video.
 	speed can be either "fast", "slow", or "normal".
-	fps is usually left to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
+	fps does not need to be set. But if set it overrides automatic value. e.g. fps is usually to 30. If we wanted to slow the video even more we can lower the fps to say 20 or less, and vice versa to speed it up a lot.
 	source_type : "disk", "youtube"
+	color is the color of the rectangle and text that I add and it can be "white", "dark_gray", or "black".
 
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
 	im_size is e.g. (960, 540)
 
-	if audio is set to True it overrides fps
+	
 	
 	TODO
 	Needs to play the sound as well.
@@ -797,17 +798,19 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	if source_type != "youtube":		
 		fps = int(cap.get(cv2. CAP_PROP_FPS))
 
-	if(speed == "fast"):
-		wait_key_time = int(np.round(1/fps * 1000 / 2))
-	elif(speed == "slow"):
-		wait_key_time = int(np.round(1/fps * 1000 * 2))
+	if not audio:
+		if(speed == "fast"):
+			wait_key_time = int(np.round(1/fps * 1000 / 2))
+		elif(speed == "slow"):
+			wait_key_time = int(np.round(1/fps * 1000 * 2))
+		else:
+			wait_key_time = int(np.round(1/fps * 1000))
 	else:
-		wait_key_time = int(np.round(1/fps * 1000))
+		wait_key_time = 1
 
 	window_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
 
-	if audio and source_type == "disk":
-		wait_key_time = 1
+	if audio and source_type == "disk":		
 		audio_path = functions1.get_audio_wav(source, video_type= video_type)
 		wf = wave.open(audio_path, 'rb')
 
@@ -843,7 +846,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		if(frame_info_index < len(frames_info) and frames_info[frame_info_index]["frame_index"] == frame_index):
 			#the frames_info item of index frame_info_index has some face(s) inside
 			for face_info in frames_info[frame_info_index]["detected_faces"]:
-				functions1.face_inform(face_info, img)
+				functions1.face_inform(face_info, img, color= color)
 
 			frame_info_index += 1				
 		

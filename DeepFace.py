@@ -781,6 +781,10 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		if(err.args[0] == 2): print("Error while attempting to open file of path \"{}\". Make sure it exists.".format(frames_info_path))
 		return
 
+	if source_type == "youtube" and audio:
+		print("audio with youtube videos is not supported for this version. Please contact the developer to request.")
+		audio = False
+
 	frame_info_index = 0
 	frame_index = 0
 
@@ -795,8 +799,10 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	if not cap.isOpened():
 		print('video not opened')
 		return None
+
 	if source_type != "youtube":		
 		fps = int(cap.get(cv2. CAP_PROP_FPS))
+		print("fps", fps)
 
 	if not audio:
 		if(speed == "fast"):
@@ -805,12 +811,9 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 			wait_key_time = int(np.round(1/fps * 1000 * 2))
 		else:
 			wait_key_time = int(np.round(1/fps * 1000))
-	else:
+
+	if audio: #assumed on disk for this version
 		wait_key_time = 1
-
-	window_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
-
-	if audio and source_type == "disk":		
 		audio_path = functions1.get_audio_wav(source, video_type= video_type)
 		wf = wave.open(audio_path, 'rb')
 
@@ -818,6 +821,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		p = pyaudio.PyAudio()
 
 		audio_rate = wf.getframerate()
+		print("audio_rate", audio_rate)
 		# open stream
 		stream = p.open(format= p.get_format_from_width(wf.getsampwidth()),
 						channels= wf.getnchannels(),
@@ -826,9 +830,11 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 
 		chunk = functions1.get_share(audio_rate, fps)
 		chunk = [chunk[i+1] - chunk[i] for i in range(len(chunk) - 1)]
-		print(chunk)
+		#print(chunk)
 
 	print("Playing the stream with annotations...\nPlease press q to abort")
+
+	window_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
 
 	#if(frames_info is not None):
 	ret = True
@@ -853,7 +859,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 		if output_video_size != ():
 			img = cv2.resize(img, output_video_size) 
 		
-		if audio and source_type == "disk":				
+		if audio: #assumed on disk for this version
 			data = wf.readframes(chunk[frame_index % len(chunk)])
 			print(len(data), chunk[frame_index % len(chunk)])			
 			if len(data) > 0:
@@ -867,7 +873,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	toc = time.time()
 	print("time is", toc - tic)
 
-	if audio and source_type == "disk":
+	if audio: #assumed on disk for this version
 		# stop stream (4)
 		stream.stop_stream()
 		stream.close()

@@ -101,7 +101,7 @@ def get_video_name(source, source_type= "disk", youtube_title = "", video_type= 
 	return frames_info_name
 
 def get_youtube_info(url, video_type):	
-	def get_youtube_info(url):		
+	def get_youtube_info(url):
 		# create youtube-dl object
 		ydl = youtube_dl.YoutubeDL({})
 		

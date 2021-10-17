@@ -471,22 +471,33 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 def get_model(model_name): # needed for the pool
 	return build_model(model_name)
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_only = True, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_and_play = False, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
 	1) The git functionality runs at the start and upon user request, according to a GUI button or maybe a listener to a text file change event, as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database. 
 	2) If skip_no_face_images is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
-	3) When process_only is True we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
+	3) When process_and_play is False we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
 	This pkl file is useful to replay smoothly (play_with_annotations function) with some limited info like name and main emotion, as well to make statistics. E.g. we can trace a particular person when he appeared and when he disappeared. It's useful for recognition as well for emotion analysis, e.g. we can track when a particular person was happy with which persons, or e.g. what is the average of each emotion for a particular person or the average of emotions for all persons. Having e.g. 6 persons detected, there can be an analysis to each and every one of them [old: we would have a table where the colomns are the name of those people]
-	This pkl file is a list of dictionaries, so it can be made a json file and can be accessed using specific database tools like Mongodb or couch or whatever.
+	This pkl file is a list of dictionaries, so a json file can be made from it and can be accessed using specific database tools like Mongodb or couch or whatever.
 	N.B: Some statistics cannot be exaggerated with their result, since we only get (for now at least) from 1 camera and it won't show a target person all the time, besides, this emotion recognition lacks continuity, e.g. I suspect that it will detect happiness while the person is actually feeling bad, but still it holds some valuable info, like e.g. how long can a person maintain an "apparent" feeling.
-	4) If actions = [] then this function only applies face recognition to a stream. We check each and every frame for recognition only. If actions = ['emotion'] then preferrably be it an offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. Anyway we have the option, probably in another function, of being recorded so that at replay time one can check the emotions continuously. 
+	4) If actions = [] then this function only applies face recognition to a stream. We check each and every frame for recognition only. If actions = ['emotion'] then preferrably be it an offline stream since it would take a lot of time. This will take each frame as being worthy of analyzing; no freezing, no time_threshold, no frame_threshold. Anyway we have the option, probably in another function, of being recorded so that at replay time one can check the emotions continuously.
 	5) Naming convention to refer to a certain person when detected in the stream can be like : "ahmad yassine_1.jpg" or "ahmad yassine 1.jpg". Statistics is usually made about each person on its own, but this relies on the user following a good convention, i.e. naming "ahmed yassine1.jpg" and "ahmad yassine2.jpg" they will be considered different persons.
-	6) New detected persons not found in database representations will be added as images to the database under a random name and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
-	7) source can be an YouTube video.
-	8) Multiprocessing so that realtime may be feasible with process_only set to False or whether set to True. User may enter how many processes he wishes. Multiprocessing can be effective in getting representations of images in the database, as well as in frames processing in case process_only is True, and in processing 1 frame at a time in case process_only is False, thus in realtime.--TODO Allowing pressing 1 to abort long running processes an terminate the program. --TODO Even later we can use distribute processes on multiple computers. --TODO
-	9) make an expiration license for the software so that it can be distributable to the user. --TODO
+	6) New detected persons not found in database representations will be added as images to the database under a random name (but images of the same person must hold the same name followed by an increased number so it has to scan through all auto-added images and personalize them) and as an embedding which will be recognized during the stream and which will be added to the representation pkl as well at the end of stream. User has to rename them and probably write the old and new names then he must click on the update button. This is made by the auto-add --TODO
+	What I made was more modest actually. New detected faces were added to the folder but held numbers as names. And recognizing them (in case more than 1 person weren't recognized) as separate individuals hasn't been made; this was left to the user, and then user had to stop the processing somewhere and rerun the function after renaming the person(s).
+	7) Source can be an YouTube video.
+	8) Multiprocessing to speed up the processing but not necessarily to be realtime. --TODO
+	I.e. if the video was a file on disk e.g. 5 processes can share the whole video in a way that the first 20% frames are assigned to process 1, the second 20% frames are assigned to process 2, and etcetera. (Not sure if future frames can be read in a separate process.)
+	If the video was a camera, we can't process future frames because we don't know them, so the number of processes has to comply with how many frames each process will take in such a way to provide speed. In this context we might ask whether realtime can be achieved or not while preserving the constraint of "every frame should be processed". And it is probable that contiguity in to-be-processed frames would lower the speed. 
+	The decision of how many processes and how many frames to be processed by each process has to be made automatically. E.g. it may be a constrained system with an objective function and some variables, i.e. an AI problem in its own.
+	Multiprocessing can be effective in getting representations of images in the database as well (not much interested in getting this realtime or the fastest possible).
+	Even later we can use distribute processes on multiple computers. --TODO	
+	10) make an expiration license for the software so that it can be distributable to the user. --TODO
+	11) Pressing ctrl+c can terminate the program, while pressing q while processing frames breaks frames processing and continues to the end of the function gracefully.
+	12) Arabic name for a video on disk works fine and it even saves the frames pkl with the Arabic name as well.
+	13) It works well if the database does not contain any image. So user is only interested in auto_add
+	14) 
+	
 	
 
 	An example : DeepFace.enhanced_stream(db_path = '/home/youssef/database2', skip_no_face_images = True, source = '/home/youssef/videos/hi.mp4')
@@ -495,51 +506,51 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	detector_backend : "retinaface", "mtcnn", "opencv", "ssd" or "dlib"
 	normalization : "base", "raw", "Facenet", "Facenet2018", "VGGFace", "VGGFace2", "ArcFace" (it's there in functions.normalize_input)
 	source_type : "disk", "youtube", "cam"
+	number_of_processes is for getting representations of images in the database
 
-	#TODO
-	launch it from the terminal or the cmd prompt --DONE
+	#TODO	
 
+	make it OOP in classes and likewise.
+
+	test it using an IP camera
+
+	apply unsupervised learning techniques to find patterns for the same guy's emotions. This can be helpful in psychiatry or knowing a "facial emotional pattern" of someone
+
+	cv2 is not really well with webm ?
+	
 	work on calling play_with_annotations right after calling enhanced_stream will automatically specify the generated pkl file.--POSTPONED
 
-	Know why some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from ?
+	Specify how small an image can be in order to be recognized. Small enough.
 
-	Test how small an image can be in order to be recognized. Small enough. --DONE
-	
-	When a face is near the edge, it doesn't probably detect it, how to fix it ?
-
-	test fidelity of the recognition in case a person is totally turning his head right or left
+	When a face is near the edge, it doesn't probably detect it ? Fix it
 
 	test later some file formats in the database like .bmp, .png, .tiff... Will they work and be reliable ?
 
 	test if 2 or more persons appear in the video, will it perform right ?
 
-	add the timing to each frame of frames_info in the pkl file
-
-	use auto_add to get a panoramic set of profile images of a particular person if that helps in recognition.
-	
-	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
-
 	The name of the frames_info_....pkl file has to contain the model and distance metric used.
 
 	Do the ensemble model if it provides better accurracy.
 
-	Arabic name for a video on disk works fine and it even saves the frames pkl with the Arabic name as well. 
+	In the process of self-correcting, if the app recognized a face in frames e.g. 126 and 128, and only detected (not recognized) a face in frame 127 in the ~same box placement, then we may add the image and assign it the name of the recognized person.
 
-	It would be interesting that in the process of finding representations of the images in the database to select a rectangle around the image. This way the user can make sure that the correct face is truly selected. On another hand, user should not be bothered with this; it's the R&D business.
-	
-	Since it's probably a good idea to expand the database of images, if the app recognized a face in frames e.g. 126 and 128, and only detected (not recognized) a face in frame 127 in the same box placement, then we may add the image and assign it the name of the recognized person.
+	In the process of self-correcting, since the recognition isn't powerful if the database of images is small, if in the same frame two faces referred to the same name (and the user knows that this is impossible) then we may add an option to reject the face with a higher distance and keep it with no name and auto-add it (if auto-add is enabled).
 
 	One good feature is to allow the user while replaying to tag a face and add it to the database, and perhaps change the tag of a face. But auto-add somehow plays the same role when supervised by the supervisor (user).
 
-	Make a script so that when double clicked it prepends all the images inside with a name given by the user. - DONE
+	------------------------
+	FLAWS :
 
-	cv2 is not really well with webm ?
+	some images aren't recognized (although they are fine, image of Anis) in the database of images to get representations from
 
-	It works well if the database does not contain any image. So user is only interested in auto_add
+	test fidelity of the recognition in case a person is totally turning his head right or left. Not fidel.
+
+
+
 	"""
 
 	functions1.print_license()
-	print("Version 1.0\n\n\n")
+	print("Version 1.1\n\n\n")
 
 	#inform about the time
 	start_time = time.ctime()
@@ -667,7 +678,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	print("Please press q to stop processing...")
 
-	if(not process_only):	
+	if(process_and_play):	
 		#here we think realtime		
 		
 		global frame_index	#in multithreading accessing this variable by another thread is reliable I guess https://stackoverflow.com/questions/53780267/an-equivalent-to-java-volatile-in-python
@@ -687,10 +698,10 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_only": process_only, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_and_play": process_and_play, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
 			cv2.imshow(frames_info_name,img)
 		
-	else: #process_only
+	else: #not process_and_play
 		tic = time.time()
 		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, frames_info_name= frames_info_name, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		toc = time.time()
@@ -755,13 +766,13 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 
 	e.g. play_with_annotations("/home/youssef/database2/hi.mp4", "/home/youssef/database2/frames_info_hi.pkl")
 	im_size is e.g. (960, 540)
-
-	
 	
 	TODO
-	Needs to play the sound as well.
-	show time of the video
-	allow a pause, rewind and forward buttons
+	Needs to play the sound as well for Youtube videos.
+	
+	Add the timing to each frame of frames_info in the pkl file and show the time while playing.
+	
+	Adding a pause, backward, and forward functionality to the user while showing frame number. Also allowing the user to navigate in time. And showing the elapsed time.
 	"""
 
 	functions1.print_license()

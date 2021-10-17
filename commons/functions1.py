@@ -441,7 +441,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 		
 		pbar.set_description("Processing frame %s " % frame_index)
 		#try:
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_only = True, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
 		"""
 		except Exception as err:
 			frame_info = None
@@ -459,7 +459,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (),detector_backend = 'opencv', align = False, target_size = (224, 224), process_only = True, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (),detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	if processing_video_size != ():
 		img = cv2.resize(img, processing_video_size)
@@ -478,14 +478,14 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 		if face_info is None:
 			continue
 
-		if(not process_only): #show the rectangles and texts without returning them.
+		if(process_and_play): #show the rectangles and texts without returning them.
 			if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
 				face_inform(face_info, img)
 		else:
 			#get the rectangles and texts then return them. We won't show them now.
 			detected_faces.append(face_info)
 			
-	if process_only:
+	if not process_and_play:
 		if detected_faces == []:
 			return None
 		else:			

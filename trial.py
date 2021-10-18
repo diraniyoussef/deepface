@@ -3,16 +3,15 @@ from functools import partial
 import os
 import time
 
-
-def heavy_work():
+def heavy_work(c):
     print("{} before sleep".format(os.getpid()))
-    time.sleep(5)
+    time.sleep(c)
     print("{} after sleep".format(os.getpid()))
 
 def _foo(a, b, c, d = "dd"):
-    print("Worker process id for {0}: {1}\n".format(a, os.getpid()))
-    heavy_work()
-    return {"a": a, "b + c": b + c}
+    print("Worker process id for {0}: {1}\n".format(c, os.getpid()))
+    heavy_work(c)
+    return {"a": a, "b": b, "c": c}
 
 if __name__ == "__main__":
     multiprocessing.freeze_support() #for windows machine

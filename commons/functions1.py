@@ -403,7 +403,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), frames_info_name= "", detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion_model = None, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), frames_info_name= "", detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion = False, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -441,7 +441,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 		
 		pbar.set_description("Processing frame %s " % frame_index)
 		#try:
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 		"""
 		except Exception as err:
 			frame_info = None
@@ -459,7 +459,7 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 
 	return frames_info
 
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (),detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion_model = None, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	if processing_video_size != ():
 		img = cv2.resize(img, processing_video_size)
@@ -470,6 +470,11 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 	
 	detected_faces = []
 	frame_info = {"frame_index": frame_index}
+	
+	emotion_model = None
+	if emotion:
+		emotion_model = DeepFace.get_emotion_model()
+
 	for face, (x, y, w, h) in faces:
 		#if w > 130: #discard small detected faces				
 		

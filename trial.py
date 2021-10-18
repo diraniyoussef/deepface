@@ -4,18 +4,15 @@ import os
 import time
 
 
-def square(n):
-    print("Worker process id for {0}: {1}\n".format(n, os.getpid()))
-    return (n*n)
+def heavy_work():
+    print("{} before sleep".format(os.getpid()))
+    time.sleep(5)
+    print("{} after sleep".format(os.getpid()))
 
 def _foo(a, b, c, d = "dd"):
-    #square = my_number * my_number
-    time.sleep(1)
-    print("b : {}\n".format(b))
-    print("c : {}\n".format(c))
-    print("d : {}\n".format(d))
-    print("Worker process id for {0}: {1}\n".format(c, os.getpid()))
-    return [a + c, c]  
+    print("Worker process id for {0}: {1}\n".format(a, os.getpid()))
+    heavy_work()
+    return {"a": a, "b + c": b + c}
 
 if __name__ == "__main__":
     multiprocessing.freeze_support() #for windows machine
@@ -26,5 +23,4 @@ if __name__ == "__main__":
 	
         result = pool.map(func, mylist)
 	
-        print(result[0])
-
+        print(result)

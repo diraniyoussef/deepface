@@ -471,6 +471,9 @@ def analyze(img_path, actions = ['emotion', 'age', 'gender', 'race'] , models = 
 def get_model(model_name): # needed for the pool
 	return build_model(model_name)
 
+def get_emotion_model():
+	return build_model('Emotion')
+
 def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_and_play = False, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
@@ -656,10 +659,10 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	df['distance_metric'] = distance_metric
 	print(df)
 	
-	emotion_model = None
-	if("emotion" in actions):
+	emotion = False
+	if "emotion" in actions:
 		print("Building emotion model...")
-		emotion_model = build_model('Emotion')
+		emotion = get_emotion_model()
 		print("Emotion model loaded")
 
 	youtube_title = ""
@@ -698,12 +701,12 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
 
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_and_play": process_and_play, "auto_add": auto_add, "db_path": db_path, "emotion_model": emotion_model, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
+			threading.Thread(target=functions1.process_frame, args = (frame_index, img, face_detector, df, threshold, model), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_and_play": process_and_play, "auto_add": auto_add, "db_path": db_path, "emotion": emotion, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
 			cv2.imshow(frames_info_name,img)
 		
 	else: #not process_and_play
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, frames_info_name= frames_info_name, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion_model = emotion_model, normalization = normalization, img_type = img_type)
+		frames_info = functions1.process_frames(cap, face_detector, df, threshold, model, processing_video_size = processing_video_size, frames_info_name= frames_info_name, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		

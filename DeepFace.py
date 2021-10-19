@@ -730,6 +730,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	return frames_info
 
+
 def prepend_imgs_names(imgs_path = ".", name = "", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	This function is originally made to be used in the auto_add folder. The images there are number followed by the .jpg extension e.g. So the purpose of this function is to prepend to these images the name of the guy whom enhanced_stream function has previously collected the images to.

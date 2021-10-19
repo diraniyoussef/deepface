@@ -5,3 +5,5 @@ import userapi
 
 if __name__ == '__main__':
   fire.Fire(userapi)
+
+#cxfreeze -c hello.py --target-dir dist

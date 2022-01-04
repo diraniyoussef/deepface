@@ -3,6 +3,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import re
 import youtube_dl
 
+import threading
+
 import imageio
 
 import numpy as np
@@ -403,7 +405,7 @@ def save_pkl(content = [], exact_path = "representations.pkl"):
 	pickle.dump(content, f)
 	f.close()
 
-def process_frames(cap, face_detector, embeddings_df, threshold, model, processing_video_size = (), frames_info_name= "", detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion = False, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frames(cap, embeddings_df, threshold, model_name, number_of_processes, processing_video_size = (), frames_info_name= "", detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion = False, normalization = "base", img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	"""
 	The output of this function is something like that :
 	[
@@ -433,15 +435,76 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 	if(video_frames_length != -1): #it's -1 if source was 0 (built-in camera)
 		pbar = tqdm(range(0, video_frames_length), position= 0)
 	
-	ret, img = cap.read() 
+	ret, img = cap.read()
 	cv2.imshow(frames_info_name,img) # this is needed for cv2.waitKey to work, and it's put outside the while loop to relieve the processor. Documentation says it here https://docs.opencv.org/2.4/modules/highgui/doc/user_interface.html#waitkey : "The function only works if there is at least one HighGUI window created and the window is active. If there are several HighGUI windows, any of them can be active."
-	while not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True:	
-		if img is None:
-			break
-		
+	
+	lock = threading.Lock()
+	
+	images_per_process = 3
+	
+	imgs = []
+	frame_indexes = []
+
+	num_of_images_to_process = 0
+
+	while not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True and img is not None:
 		pbar.set_description("Processing frame %s " % frame_index)
-		#try:
-		frame_info = process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+		
+		if number_of_processes == 1 :
+			frame_info = process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+			"""
+			except Exception as err:
+				frame_info = None
+				print("\nException while processing frame.\n", err)
+			"""
+
+			if(frame_info is not None):
+				frames_info.append(frame_info)
+			
+			frame_index += 1
+			pbar.update()
+
+			ret, img = cap.read()
+
+			continue
+		else:
+			#collect some images then process them
+			imgs.append(img)
+			frame_indexes.append(frame_index)
+			
+			frame_index += 1
+			
+			if num_of_images_to_process < images_per_process * number_of_processes:
+				num_of_images_to_process += 1
+				continue
+
+			num_of_images_to_process = 0
+
+			lock.acquire()
+			
+			#share_list = get_share(employees_len, number_of_processes)
+			with Pool(number_of_processes) as pool:
+				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, pbar, images_per_process, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+				#p = pool.map(func, range(len(share_list)))
+				p = pool.map(func, range(len(number_of_processes)))
+				result_l = list(p)
+
+			imgs = []
+			frame_indexes = []
+		
+			for d in result_l:
+				frames_info.extend(d)
+	
+	pbar.set_description("Done frames processing.")
+
+	return frames_info
+
+def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, pbar, imgs_per_process, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+
+	frames_info = []
+	
+	for i in range(process_index * imgs_per_process, (process_index + 1) * imgs_per_process):
+		frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 		"""
 		except Exception as err:
 			frame_info = None
@@ -450,22 +513,18 @@ def process_frames(cap, face_detector, embeddings_df, threshold, model, processi
 		if(frame_info is not None):
 			frames_info.append(frame_info)
 		
-		frame_index += 1
-		pbar.update()		
-
-		ret, img = cap.read() 
+		pbar.update()
 	
-	pbar.set_description("Done frames processing.")
-
 	return frames_info
-
-def process_frame(frame_index, img, face_detector, embeddings_df, threshold, model, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+	
+def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	if processing_video_size != ():
 		img = cv2.resize(img, processing_video_size)
 
 	resolution = img.shape
 	
+	face_detector = DeepFace.get_face_detector(detector_backend)
 	faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = align)
 	
 	detected_faces = []
@@ -477,7 +536,7 @@ def process_frame(frame_index, img, face_detector, embeddings_df, threshold, mod
 
 	for face, (x, y, w, h) in faces:
 		#if w > 130: #discard small detected faces				
-		
+		model = DeepFace.get_model(model_name)
 		face_info = process_face(face, (x, y, w, h), resolution, embeddings_df, threshold, model, emotion_model = emotion_model, detector_backend = detector_backend, target_size = (target_size[0], target_size[1]), normalization = normalization, img_type = img_type, auto_add = auto_add, db_path = db_path)
 		
 		if face_info is None:
@@ -987,3 +1046,55 @@ def get_find_result(df, represent, img_paths, model_names, models, metric_names,
 
 		#----------------------------------
 	return resp_obj
+
+class OptimizeResources:
+	def execute(self, frames_num):
+		#frames_num is the number of frames to be processed by the calling process.	
+		print("Worker process id for frames_num {0} is {1}\n".format(frames_num, os.getpid()))
+		for i in range(100000*frames_num):
+			pass		
+
+	def objective(self):
+		#calculate average frame processing speed, and return the measure.
+
+		pass
+
+	def controller(self):
+		#allocate frames number to different processes (while respecting constraints), execute then measure (search for a maximum objective value). If the measure is agreed upon then follow on.
+		speed = []
+		max_num_of_processes = 5
+		max_num_of_frames = 8
+		
+		#the case of 1 process
+		speed.append([])
+		for f_num in range(3, max_num_of_frames + 1):
+			tic = time.time()
+			self.execute(f_num)
+			s = f_num / (time.time() - tic)
+			print("speed is", s)
+			speed[0].append([f_num, s])
+		
+		
+		for p_num in range(2, max_num_of_processes + 1):
+			print("p_num is ", p_num)
+			speed.append([])
+			for num_of_frames in range(3, max_num_of_frames + 1):
+				print("num_of_frames is ", num_of_frames)
+
+				frames_num_per_process = int(num_of_frames / p_num)
+				arg_l = [frames_num_per_process]*p_num
+				print("arg_l is ", arg_l)
+				executed_frames = frames_num_per_process * p_num				
+
+				p = Pool(p_num)
+				tic = time.time()
+				result = p.map(self.execute, arg_l)				
+				s = executed_frames / (time.time() - tic)
+				print("speed is", s)				
+				speed[-1].append([executed_frames, s])
+				p.close()
+				p.terminate()
+		
+		#print(speed)
+		for s in speed:
+			print(s)

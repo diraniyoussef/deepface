@@ -5,6 +5,7 @@ import os
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+import multiprocessing
 import time
 from os import path
 import numpy as np
@@ -575,7 +576,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	#------------------------
 
 	print("Detector backend is ", detector_backend, ". Building face detector model...")
-	face_detector = get_face_detector(detector_backend)
+	get_face_detector(detector_backend)
 
 	#------------------------
 
@@ -608,6 +609,9 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	pkl_path = db_path+"/"+file_name
 
 	embeddings = []
+
+	if number_of_processes > 1:
+		multiprocessing.freeze_support()
 
 	if path.exists(pkl_path):
 
@@ -684,7 +688,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	print("Please press q to stop processing...")
 
-	if(process_and_play):	
+	if process_and_play:
 		#here we think realtime		
 		
 		global frame_index	#in multithreading accessing this variable by another thread is reliable I guess https://stackoverflow.com/questions/53780267/an-equivalent-to-java-volatile-in-python
@@ -709,7 +713,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		
 	else: #not process_and_play
 		tic = time.time()
-		frames_info = functions1.process_frames(cap, df, threshold, model_name, number_of_processes, processing_video_size = processing_video_size, frames_info_name= frames_info_name, detector_backend = detector_backend, align = align, target_size = (input_shape_y, input_shape_x), auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+		frames_info = functions1.process_frames(cap, df, threshold, model_name, number_of_processes, processing_video_size=processing_video_size, frames_info_name=frames_info_name, detector_backend=detector_backend, align=align, target_size= (input_shape_y, input_shape_x), auto_add=auto_add, db_path=db_path, emotion=emotion, normalization=normalization, img_type=img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		

@@ -432,23 +432,23 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 	frame_index = 0
 	
 	video_frames_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-	if(video_frames_length != -1): #it's -1 if source was 0 (built-in camera)
+	if video_frames_length != -1 and number_of_processes == 1: #it's -1 if source was 0 (built-in camera)
 		pbar = tqdm(range(0, video_frames_length), position= 0)
 	
 	ret, img = cap.read()
 	cv2.imshow(frames_info_name,img) # this is needed for cv2.waitKey to work, and it's put outside the while loop to relieve the processor. Documentation says it here https://docs.opencv.org/2.4/modules/highgui/doc/user_interface.html#waitkey : "The function only works if there is at least one HighGUI window created and the window is active. If there are several HighGUI windows, any of them can be active."
 	
-	lock = threading.Lock()
-	
-	images_per_process = 3
-	
 	imgs = []
 	frame_indexes = []
 
-	num_of_images_to_process = 0
+	if number_of_processes > 1:
+		#lock = threading.Lock()
+		images_per_process = 15
+		num_of_images_to_process = 0
+		my_pool_list = [i for i in range(images_per_process * number_of_processes)]
 
 	while not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True and img is not None:
-		pbar.set_description("Processing frame %s " % frame_index)
+		#pbar.set_description("Processing frame %s " % frame_index)
 		
 		if number_of_processes == 1 :
 			frame_info = process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
@@ -474,48 +474,57 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 			
 			frame_index += 1
 			
-			if num_of_images_to_process < images_per_process * number_of_processes:
+			if num_of_images_to_process < images_per_process * number_of_processes - 1:
 				num_of_images_to_process += 1
 				continue
 
+			print("\n", frame_indexes)
+			#print(imgs)
+
 			num_of_images_to_process = 0
 
-			lock.acquire()
+			#lock.acquire()
 			
 			#share_list = get_share(employees_len, number_of_processes)
 			with Pool(number_of_processes) as pool:
-				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, pbar, images_per_process, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size= (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 				#p = pool.map(func, range(len(share_list)))
-				p = pool.map(func, range(len(number_of_processes)))
-				result_l = list(p)
+				result_l = pool.map(func, my_pool_list)
+				#p = pool.map(func1, range(number_of_processes))
+				#result_l = list(p)
+				#for d in result_l:
+				frames_info.extend(result_l)
+				#lock.release()
 
 			imgs = []
 			frame_indexes = []
-		
-			for d in result_l:
-				frames_info.extend(d)
 	
-	pbar.set_description("Done frames processing.")
+	if(video_frames_length != -1 and number_of_processes == 1):
+		pbar.set_description("Done frames processing.")
 
 	return frames_info
 
-def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, pbar, imgs_per_process, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 
-	frames_info = []
+def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+
+	#frames_info = []
 	
-	for i in range(process_index * imgs_per_process, (process_index + 1) * imgs_per_process):
-		frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
-		"""
-		except Exception as err:
-			frame_info = None
-			print("\nException while processing frame.\n", err)
-		"""
-		if(frame_info is not None):
-			frames_info.append(frame_info)
-		
-		pbar.update()
+	#for i in range(process_index * imgs_per_process, (process_index + 1) * imgs_per_process):
+	i = process_index
+	frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play=process_and_play, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+	"""
+	except Exception as err:
+		frame_info = None
+		print("\nException while processing frame.\n", err)
+	"""
+	#if(frame_info is not None):
+	#	frames_info.append(frame_info)
 	
-	return frames_info
+	#frames_info.append(i)
+	#print(i)	
+	#pbar.update()
+
+	return frame_info
 	
 def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	

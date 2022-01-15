@@ -11,11 +11,11 @@ def heavy_work():
 
 def _foo(a, b, c, d = "dd"):
     print("Worker process id for {0}: {1}\n".format(c, os.getpid()))
-    heavy_work(c)
+    #heavy_work(c)
     return {"a": a, "b": b, "c": c}
 
-if __name__ == "__main__":
-    multiprocessing.freeze_support() #for windows machine
+def multiPro():
+    #multiprocessing.freeze_support() #for windows machine
     mylist = [i for i in range(15)]
     with multiprocessing.Pool(4) as pool:
         func = partial(_foo, 66, 88)

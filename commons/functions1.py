@@ -443,9 +443,9 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 
 	if number_of_processes > 1:
 		#lock = threading.Lock()
-		images_per_process = 15
+		imgs_per_process = 15
 		num_of_images_to_process = 0
-		my_pool_list = [i for i in range(images_per_process * number_of_processes)]
+		my_pool_list = range(number_of_processes)
 
 	while not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True and img is not None:
 		#pbar.set_description("Processing frame %s " % frame_index)
@@ -474,8 +474,9 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 			
 			frame_index += 1
 			
-			if num_of_images_to_process < images_per_process * number_of_processes - 1:
-				num_of_images_to_process += 1
+			if num_of_images_to_process < imgs_per_process * number_of_processes - 1:
+				ret, img = cap.read()
+				num_of_images_to_process += 1				
 				continue
 
 			print("\n", frame_indexes)
@@ -487,13 +488,13 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 			
 			#share_list = get_share(employees_len, number_of_processes)
 			with Pool(number_of_processes) as pool:
-				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size= (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size= (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 				#p = pool.map(func, range(len(share_list)))
 				result_l = pool.map(func, my_pool_list)
 				#p = pool.map(func1, range(number_of_processes))
 				#result_l = list(p)
-				#for d in result_l:
-				frames_info.extend(result_l)
+				for d in result_l:
+					frames_info.extend(d)
 				#lock.release()
 
 			imgs = []
@@ -505,26 +506,29 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 	return frames_info
 
 
-def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 
-	#frames_info = []
-	
-	#for i in range(process_index * imgs_per_process, (process_index + 1) * imgs_per_process):
-	i = process_index
-	frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play=process_and_play, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
-	"""
-	except Exception as err:
-		frame_info = None
-		print("\nException while processing frame.\n", err)
-	"""
-	#if(frame_info is not None):
-	#	frames_info.append(frame_info)
+	frames_info = []
+	print("process pid is {}. frame_indexes is {}.".format(os.getpid(), frame_indexes))
+	for i in range(process_index * imgs_per_process, (process_index + 1) * imgs_per_process):
+		print("process pid is {}. process index is {}. And img is {}".format(os.getpid(), i, imgs[0][100]))
+		if len(frame_indexes) <= i:
+			break
+		frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play=process_and_play, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+		
+		"""
+		except Exception as err:
+			frame_info = None
+			print("\nException while processing frame.\n", err)
+		"""
+		if(frame_info is not None):
+			frames_info.append(frame_info)
 	
 	#frames_info.append(i)
 	#print(i)	
 	#pbar.update()
-
-	return frame_info
+	print("process pid is {}. Ending.".format(os.getpid()))
+	return frames_info
 	
 def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	

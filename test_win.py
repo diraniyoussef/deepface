@@ -17,7 +17,7 @@ from deepface import DeepFace
 	#instructions.instructions()
 
 if __name__=="__main__":
-	#DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database1', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/videos/trial1.mp4', processing_video_size = (), model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 1, auto_add = True, normalization = "base", distance_metric = 'cosine') #detector_backend="dlib", detector_backend="mtcnn"
+	#DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database1', source = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/videos/trial1.mp4', processing_video_size = (), model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine') #detector_backend="dlib", detector_backend="mtcnn"
 	DeepFace.play_with_annotations("C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/videos/trial1.mp4", "C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database1/frames_info_trial1.pkl", speed = "normal", fps = 30, output_video_size = (800,600)) # (144, 82)
 
 	#DeepFace.enhanced_stream(db_path = 'C:/Users/Dirani/ProgrammingProjects/DeepFace_Project/database', source = 'https://www.youtube.com/watch?v=g1Aq16fGeeQ&ab_channel=NathanKutz', source_type= "youtube", model_name = "VGG-Face", detector_backend="dlib", actions = [], number_of_processes = 2, auto_add = True, normalization = "base", distance_metric = 'cosine') #detector_backend="dlib", detector_backend="mtcnn", processing_video_size = (960, 540)

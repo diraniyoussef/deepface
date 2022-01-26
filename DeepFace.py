@@ -676,13 +676,19 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 	if source_type != "youtube":
 		cap = cv2.VideoCapture(source) #cam or path to video file on disk
 	elif source_type == "youtube":
-		cap, youtube_title, youtube_ext, youtube_width, youtube_height, youtube_fps = functions1.get_youtube_info(source, video_type)
+		cap, youtube_title, youtube_ext, youtube_width, youtube_height, fps = functions1.get_youtube_info(source, video_type)
 		if cap is None:
 			return None
 
 	if not cap.isOpened(): #you may put this condition in the while loop of cap.read
 		print('video not opened')
 		return None
+	
+	if source_type != "youtube":		
+		fps = int(cap.get(cv2. CAP_PROP_FPS))
+		print("fps", fps)
+
+	wait_key_time = int(np.round(1/fps * 1000))
 
 	frames_info_name = functions1.get_video_name(source, source_type, youtube_title, video_type)
 
@@ -703,7 +709,7 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		
 		frames_info = []
 
-		while not (cv2.waitKey(30) & 0xFF == ord('q')) and ret == True and img is not None :		
+		while not (cv2.waitKey(wait_key_time) & 0xFF == ord('q')) and ret == True and img is not None :		
 
 			print(frame_index)						
 

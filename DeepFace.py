@@ -478,13 +478,13 @@ def get_emotion_model():
 def get_face_detector(detector_backend):
 	return FaceDetector.build_model(detector_backend)
 
-def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_and_play = False, number_of_processes = 1):
+def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='VGG-Face', skip_no_face_images = True, detector_backend = 'opencv', align = False, normalization = 'base', distance_metric = 'cosine', source = "", source_type = "disk", processing_video_size = (), process_rt = False, number_of_processes = 1):
 	"""
 	This function is similar to enhanced_find function but it acts when detecting a face in a video instead of an image.
 	These are the additional features :
 	1) The git functionality runs at the start and upon user request, according to a GUI button or maybe a listener to a text file change event, as well that is while the code is running; this is the case where the video is running and user added some images to someone in the database or changed the name of someone or some image in the database. 
 	2) If skip_no_face_images is set to False code will add a probably bad image representation of the full image when no face is detected. But when set to True continue with no detected face, user will be informed and code will skip this particular image and will make the representations of other useful images if existing.
-	3) When process_and_play is False we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
+	3) When process_rt is False we create or override a pkl file. [old: It's like a csv file generated showing in every timestamp all the persons who were there. The names of the colomns of the csv file are the names of the persons. A 50 minutes stream of 30 fps will be recorded in a .csv file which can be opened in Excel without problems. If we needed more stream time we could simply make another csv file when the first one reaches e.g. 1 million records.] 
 	This pkl file is useful to replay smoothly (play_with_annotations function) with some limited info like name and main emotion, as well to make statistics. E.g. we can trace a particular person when he appeared and when he disappeared. It's useful for recognition as well for emotion analysis, e.g. we can track when a particular person was happy with which persons, or e.g. what is the average of each emotion for a particular person or the average of emotions for all persons. Having e.g. 6 persons detected, there can be an analysis to each and every one of them [old: we would have a table where the colomns are the name of those people]
 	This pkl file is a list of dictionaries, so a json file can be made from it and can be accessed using specific database tools like Mongodb or couch or whatever.
 	N.B: Some statistics cannot be exaggerated with their result, since we only get (for now at least) from 1 camera and it won't show a target person all the time, besides, this emotion recognition lacks continuity, e.g. I suspect that it will detect happiness while the person is actually feeling bad, but still it holds some valuable info, like e.g. how long can a person maintain an "apparent" feeling.
@@ -688,46 +688,54 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	print("Please press q to stop processing...")
 
-	if process_and_play:
-		#here we think realtime		
+	if process_rt:
+		#here we think realtime
 		
 		global frame_index	#in multithreading accessing this variable by another thread is reliable I guess https://stackoverflow.com/questions/53780267/an-equivalent-to-java-volatile-in-python
 		frame_index = 0
 
 		print("Attempting to play the stream with annotations...\nPress q to abort")
 
-		ret = True
-		while(not (cv2.waitKey(1) & 0xFF == ord('q')) and ret == True): 
-			ret, img = cap.read() 
+		ret, img = cap.read()
+		cv2.imshow(frames_info_name, img)
 
-			if img is None:
-				break
-			
-			frame_index += 1
-			print(frame_index)
+		lock = threading.Lock()
+		
+		frames_info = []
+
+		while not (cv2.waitKey(30) & 0xFF == ord('q')) and ret == True and img is not None :		
+
+			print(frame_index)						
 
 			#whether detection alone or with emotion, we need to execute all that in a separate thread in order not to interrupt reading the next frame(s) and showing them to user i.e. preserving user experience.
-
-			threading.Thread(target=functions1.process_frame, args = (frame_index, img, df, threshold, model_name), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_and_play": process_and_play, "auto_add": auto_add, "db_path": db_path, "emotion": emotion, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/
-			cv2.imshow(frames_info_name,img)
+			if lock.acquire(False) :
+				#pass
+				threading.Thread(target=functions1.process_frame_rt, args = (frame_index, img, df, threshold, model_name, frames_info, lock), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_rt": process_rt, "auto_add": auto_add, "db_path": db_path, "emotion": emotion, "normalization": normalization, "img_type": img_type}).start() #https://www.geeksforgeeks.org/multithreading-python-set-1/ and https://www.geeksforgeeks.org/multithreading-in-python-set-2-synchronization/			
+			
+			#cv2.imshow(frames_info_name, img)
+			ret, img = cap.read()
+			
+			frame_index += 1
 		
-	else: #not process_and_play
+		lock.acquire(True) #we wait for a frame under processing
+		
+	else: #not process_rt
 		tic = time.time()
 		frames_info = functions1.process_frames(cap, df, threshold, model_name, number_of_processes, processing_video_size=processing_video_size, frames_info_name=frames_info_name, detector_backend=detector_backend, align=align, target_size= (input_shape_y, input_shape_x), auto_add=auto_add, db_path=db_path, emotion=emotion, normalization=normalization, img_type=img_type)
 		toc = time.time()
 		print("Processing frames done with " + str(toc - tic) + " seconds")
 		
-		#save the frames info in a pkl file
-		if frames_info is not None:			
-			frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
-			frames_info_name = frames_info_name.replace("-", "_").lower()
-			#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
-			frames_info_name = db_path+"/"+frames_info_name
-			print("Saving frames info of the stream to a pkl file...")
-			functions1.save_pkl(content = frames_info, exact_path = frames_info_name)
-			print("Done saving")
-		else:
-			print("no face was detected in this stream")
+	#save the frames info in a pkl file
+	if frames_info is not None:			
+		frames_info_name = "frames_info_%s.pkl" % (frames_info_name)
+		frames_info_name = frames_info_name.replace("-", "_").lower()
+		#frames_info_name = "/".join(source.split("/")[:-1])+"/"+frames_info_name
+		frames_info_name = db_path+"/"+frames_info_name
+		print("Saving frames info of the stream to a pkl file...")
+		functions1.save_pkl(content = frames_info, exact_path = frames_info_name)
+		print("Done saving")
+	else:
+		print("no face was detected in this stream")
 			
 	#kill open cv things
 	cap.release()
@@ -861,7 +869,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 	#if(frames_info is not None):
 	ret = True
 	tic = time.time()
-	while(not (cv2.waitKey(wait_key_time) & 0xFF == ord('q')) and ret == True):
+	while not (cv2.waitKey(wait_key_time) & 0xFF == ord('q')) and ret == True :
 		ret, img = cap.read() 
 
 		if img is None:
@@ -888,7 +896,7 @@ def play_with_annotations(source, frames_info_path, source_type = "disk", speed 
 				stream.write(data) #play audio
 				pass
 			
-		cv2.imshow(window_name,img)
+		cv2.imshow(window_name, img)
 		
 		frame_index += 1
 		#print(frame_index, frame_info_index, frames_info[frame_info_index]["frame_index"])

@@ -451,7 +451,7 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 		#pbar.set_description("Processing frame %s " % frame_index)
 		
 		if number_of_processes == 1 :
-			frame_info = process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+			frame_info = process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_rt = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 			"""
 			except Exception as err:
 				frame_info = None
@@ -488,7 +488,7 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 			
 			#share_list = get_share(employees_len, number_of_processes)
 			with Pool(number_of_processes) as pool:
-				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size= (target_size[0], target_size[1]), process_and_play = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+				func = partial(prepare_multiprocess_frame, frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size= (target_size[0], target_size[1]), process_rt = False, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 				#p = pool.map(func, range(len(share_list)))
 				result_l = pool.map(func, my_pool_list)
 				#p = pool.map(func1, range(number_of_processes))
@@ -506,7 +506,7 @@ def process_frames(cap, embeddings_df, threshold, model_name, number_of_processe
 	return frames_info
 
 
-def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, model_name, imgs_per_process, process_index, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_rt = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 
 	frames_info = []
 	print("process pid is {}. frame_indexes is {}.".format(os.getpid(), frame_indexes))
@@ -514,7 +514,7 @@ def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, mo
 		print("process pid is {}. process index is {}. And img is {}".format(os.getpid(), i, imgs[0][100]))
 		if len(frame_indexes) <= i:
 			break
-		frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_and_play=process_and_play, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
+		frame_info = process_frame(frame_indexes[i], imgs[i], embeddings_df, threshold, model_name, processing_video_size= processing_video_size, detector_backend = detector_backend, align = align, target_size = (target_size[0], target_size[1]), process_rt=process_rt, auto_add = auto_add, db_path = db_path, emotion = emotion, normalization = normalization, img_type = img_type)
 		
 		"""
 		except Exception as err:
@@ -530,7 +530,17 @@ def prepare_multiprocess_frame(frame_indexes, imgs, embeddings_df, threshold, mo
 	print("process pid is {}. Ending.".format(os.getpid()))
 	return frames_info
 	
-def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_and_play = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+def process_frame_rt(frame_index, img, embeddings_df, threshold, model_name, frames_info, lock, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_rt = True, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+	print("entering process_frame_rt")
+	frame_info = process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size=processing_video_size, detector_backend=detector_backend, align=align, target_size=(target_size[0], target_size[1]), process_rt=process_rt, auto_add=auto_add, db_path=db_path, emotion=emotion, normalization=normalization, img_type=img_type)
+	
+	if(frame_info is not None):
+		print("found something")
+		frames_info.append(frame_info)
+
+	lock.release()
+
+def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_rt = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	if processing_video_size != ():
 		img = cv2.resize(img, processing_video_size)
@@ -554,20 +564,21 @@ def process_frame(frame_index, img, embeddings_df, threshold, model_name, proces
 		
 		if face_info is None:
 			continue
-
-		if(process_and_play): #show the rectangles and texts without returning them.
-			if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
-				face_inform(face_info, img)
+		"""		
+		if(process_rt): #show the rectangles and texts without returning them.
+			#if(DeepFace.frame_index == frame_index): #realtime condition which is almost impossible to happen. This won't return anything
+			#	face_inform(face_info, img)
 		else:
-			#get the rectangles and texts then return them. We won't show them now.
-			detected_faces.append(face_info)
+		"""
+		#get the rectangles and texts then return them. We won't show them now.
+		detected_faces.append(face_info)
 			
-	if not process_and_play:
-		if detected_faces == []:
-			return None
-		else:			
-			frame_info["detected_faces"] = detected_faces
-			return frame_info
+	#if not process_rt:
+	if detected_faces == []:
+		return None
+	else:			
+		frame_info["detected_faces"] = detected_faces
+		return frame_info
 
 def process_face(face, pos_dim, resolution, df, threshold, model, emotion_model = None, detector_backend = 'opencv', target_size = (224, 224), normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png"), auto_add = False, db_path = "."):
 	"""

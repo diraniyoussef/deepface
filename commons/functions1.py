@@ -540,6 +540,10 @@ def process_frame_rt(frame_index, img, embeddings_df, threshold, model_name, fra
 
 	lock.release()
 
+def process_out_stream(embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_rt = True, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
+	
+	pass
+
 def process_frame(frame_index, img, embeddings_df, threshold, model_name, processing_video_size = (), detector_backend = 'opencv', align = False, target_size = (224, 224), process_rt = False, auto_add = False, db_path = ".", emotion = False, normalization = 'base', img_type = (".jpg", ".jpeg", ".bmp", ".png")):
 	
 	if processing_video_size != ():

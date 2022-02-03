@@ -657,11 +657,6 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 
 	functions1.save_pkl(content = embeddings, exact_path = pkl_path)
 
-	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
-
-	if not functions1.is_valid_disk_source_file(source, source_type, video_type) :
-		return None
-
 	df = pd.DataFrame(embeddings, columns = ['employee', 'embedding'])
 	df['distance_metric'] = distance_metric
 	print(df)
@@ -671,6 +666,16 @@ def enhanced_stream(db_path = '.', auto_add = False, actions = [], model_name ='
 		print("Building emotion model...")
 		emotion = get_emotion_model()
 		print("Emotion model loaded")
+
+	if source_type == "out_stream": #assuming process_rt is true of course
+		threading.Thread(target=functions1.process_out_stream, args = (df, threshold, model_name), kwargs={ "processing_video_size": processing_video_size, "detector_backend": detector_backend, "align": align, "target_size": (input_shape_y, input_shape_x), "process_rt": process_rt, "auto_add": auto_add, "db_path": db_path, "emotion": emotion, "normalization": normalization, "img_type": img_type}).start()
+		if input("write 'quit' to quit") == "quit":
+			return
+
+	video_type = (".mp4", ".flv", ".webm") # put in the order of preference
+
+	if not functions1.is_valid_disk_source_file(source, source_type, video_type) :
+		return None
 
 	youtube_title = ""
 	if source_type != "youtube":
